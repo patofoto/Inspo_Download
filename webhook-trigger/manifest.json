@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Webhook Trigger",
+  "version": "1.0",
+  "description": "Click the toolbar button to fire a webhook",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "icons": {
+    "48": "icon.png"
+  },
+  "action": {
+    "default_icon": "icon.png",
+    "default_title": "Fire Webhook"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html"
+}
