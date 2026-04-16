@@ -1,22 +1,23 @@
-version: '3.8'
+services:                                                                                                                                   
+    image-downloader-server:                                                                                                                  
+      image: node:18-alpine                                                                                                                   
+      container_name: image-downloader-server                                                                                                 
+      working_dir: /app                                                                                                                       
+      command: sh -c "npm install --production && node server.js"                                                                             
+      ports:                                                                                                                                  
+        - "3001:3000"
+      environment:                                                                                                                            
+        NETWORK_DRIVE_PATH: /downloads
+        API_KEY: ${API_KEY}                                                                                                                   
+        NODE_ENV: production
+      volumes:
+        - ./server.js:/app/server.js
+        - ./package.json:/app/package.json
+        - /media/pato/Media_HD/Inspiration Board:/downloads                                                                                   
+      restart: unless-stopped
+      networks:                                                                                                                               
+        - proxy   
 
-services:
-  image-downloader-server:
-    build: .
-    container_name: image-downloader-server
-    ports:
-      - "3001:3000"
-    environment:
-      NETWORK_DRIVE_PATH: /downloads
-      API_KEY: ${API_KEY}
-    volumes:
-      # Mount your network drive here
-      # Change the host path to your actual network drive mount point
-      - /media/pato/Media_HD/Inspiration Board:/downloads
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
+  networks:
+    proxy:
+      external: true
