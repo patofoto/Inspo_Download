@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  image-downloader-server:
+    build: .
+    container_name: image-downloader-server
+    ports:
+      - "3001:3000"
+    environment:
+      NETWORK_DRIVE_PATH: /downloads
+      API_KEY: ${API_KEY}
+    volumes:
+      # Mount your network drive here
+      # Change the host path to your actual network drive mount point
+      - /media/pato/Media_HD/Inspiration Board:/downloads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
