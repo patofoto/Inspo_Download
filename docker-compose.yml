@@ -11,8 +11,8 @@ services:
         API_KEY: ${API_KEY}                                                                                                                   
         NODE_ENV: production
       volumes:
-        - ./server.js:/app/server.js
-        - ./package.json:/app/package.json
+        - ./server/server.js:/app/server.js
+        - ./server/package.json:/app/package.json
         - /media/pato/Media_HD/Inspiration Board:/downloads                                                                                   
       restart: unless-stopped
       networks:                                                                                                                               
