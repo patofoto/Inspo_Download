@@ -1,23 +1,23 @@
-services:                                                                                                                                   
-    image-downloader-server:                                                                                                                  
-      image: node:18-alpine                                                                                                                   
-      container_name: image-downloader-server                                                                                                 
-      working_dir: /app                                                                                                                       
-      command: sh -c "npm install --production && node server.js"                                                                             
-      ports:                                                                                                                                  
-        - "3001:3000"
-      environment:                                                                                                                            
-        NETWORK_DRIVE_PATH: /downloads
-        API_KEY: ${API_KEY}                                                                                                                   
-        NODE_ENV: production
-      volumes:
-        - ./server/server.js:/app/server.js
-        - ./server/package.json:/app/package.json
-        - /media/pato/Media_HD/Inspiration Board:/downloads                                                                                   
-      restart: unless-stopped
-      networks:                                                                                                                               
-        - proxy   
+services:
+  image-downloader-server:
+    image: node:18-alpine
+    container_name: image-downloader-server
+    working_dir: /app
+    command: sh -c "npm install --production && node server.js"
+    ports:
+      - "3001:3000"
+    environment:
+      NETWORK_DRIVE_PATH: /downloads
+      API_KEY: ${API_KEY}
+      NODE_ENV: production
+    volumes:
+      - ./server/server.js:/app/server.js
+      - ./server/package.json:/app/package.json
+      - /media/pato/Media_HD/Inspiration Board:/downloads
+    restart: unless-stopped
+    networks:
+      - proxy
 
-  networks:
-    proxy:
-      external: true
+networks:
+  proxy:
+    external: true
