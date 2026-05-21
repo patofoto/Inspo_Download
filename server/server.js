@@ -30,14 +30,53 @@ function checkApiKey(req, res, next) {
   next();
 }
 
+// Extract image URL from Tumblr post HTML
+async function extractTumblrImage(url) {
+  try {
+    // Check if it's a Tumblr post URL
+    if (!url.includes("tumblr.com")) {
+      return url;
+    }
+
+    // Fetch the Tumblr post HTML
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0"
+      }
+    });
+
+    if (!response.ok) {
+      return url;
+    }
+
+    const html = await response.text();
+
+    // Extract image URL from Tumblr post
+    const match = html.match(/https:\/\/(?:64\.media|media)\.tumblr\.com\/[^"' >]+\.(?:jpg|jpeg|png|gif|webp)/i);
+
+    if (match) {
+      console.log(`Extracted Tumblr image: ${match[0]}`);
+      return match[0];
+    }
+
+    return url;
+  } catch (error) {
+    console.error("Tumblr extraction error:", error);
+    return url;
+  }
+}
+
 // Upload endpoint — server fetches the image by URL to avoid browser CORS issues
 app.post("/upload", express.json(), checkApiKey, async (req, res) => {
   try {
-    const { imageUrl, sourceUrl } = req.body;
+    let { imageUrl, sourceUrl } = req.body;
 
     if (!imageUrl) {
       return res.status(400).json({ error: "No image URL provided" });
     }
+
+    // Extract image URL from Tumblr posts if needed
+    imageUrl = await extractTumblrImage(imageUrl);
 
     // Fetch the image from the server side
     const response = await fetch(imageUrl, {
