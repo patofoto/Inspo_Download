@@ -67,10 +67,11 @@ async function extractTumblrImage(url) {
 
     if (articleMatch) {
       postContent = articleMatch[0];
-      console.log(`[EXTRACT] Article length before header removal: ${postContent.length}`);
-      // Remove header section from article (contains profile/avatar)
+      console.log(`[EXTRACT] Article length before cleanup: ${postContent.length}`);
+      // Remove header (profile/avatar) and footer (interactions) sections
       postContent = postContent.replace(/<header[^>]*>[\s\S]*?<\/header>/i, "");
-      console.log(`[EXTRACT] Article length after header removal: ${postContent.length}`);
+      postContent = postContent.replace(/<footer[^>]*>[\s\S]*?<\/footer>/i, "");
+      console.log(`[EXTRACT] Article length after cleanup: ${postContent.length}`);
     }
 
     // If no article found, try to find specific post content divs
