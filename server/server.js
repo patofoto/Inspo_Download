@@ -2,6 +2,7 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const cors = require("cors");
+const sharp = require("sharp");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -33,12 +34,16 @@ function checkApiKey(req, res, next) {
 // Extract image URL from Tumblr post HTML
 async function extractTumblrImage(url) {
   try {
+    console.log(`[EXTRACT] Starting extraction for: ${url.substring(0, 60)}...`);
+
     // Check if it's a Tumblr post URL
     if (!url.includes("tumblr.com")) {
+      console.log(`[EXTRACT] Not a Tumblr URL, returning as-is`);
       return url;
     }
 
     // Fetch the Tumblr post HTML
+    console.log(`[EXTRACT] Fetching HTML...`);
     const response = await fetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0"
@@ -46,48 +51,71 @@ async function extractTumblrImage(url) {
     });
 
     if (!response.ok) {
+      console.log(`[EXTRACT] Fetch failed: ${response.statusText}`);
       return url;
     }
 
     const html = await response.text();
+    console.log(`[EXTRACT] Got HTML, length: ${html.length}`);
 
-    // Try to find the main post content area (not header/profile)
-    // Tumblr post content is typically in article or main content sections
-    let postContent = html;
+    // Find the post content area (article tag or post content div)
+    let postContent = "";
 
-    // Look for main post content patterns
-    const postMatch = html.match(/<article[^>]*>[\s\S]*?<\/article>/i);
-    if (postMatch) {
-      postContent = postMatch[0];
-    } else {
-      // Fallback: look for divs with post-related classes
-      const contentMatch = html.match(/<div[^>]*(?:class|id)="[^"]*(?:post|content|body)[^"]*"[^>]*>[\s\S]*?<\/div>/i);
+    // Try to find article with post content
+    const articleMatch = html.match(/<article[^>]*>[\s\S]*?<\/article>/i);
+    console.log(`[EXTRACT] Article match: ${articleMatch ? 'found' : 'not found'}`);
+
+    if (articleMatch) {
+      postContent = articleMatch[0];
+      console.log(`[EXTRACT] Article length before header removal: ${postContent.length}`);
+      // Remove header section from article (contains profile/avatar)
+      postContent = postContent.replace(/<header[^>]*>[\s\S]*?<\/header>/i, "");
+      console.log(`[EXTRACT] Article length after header removal: ${postContent.length}`);
+    }
+
+    // If no article found, try to find specific post content divs
+    if (!postContent) {
+      console.log(`[EXTRACT] No article, trying content divs...`);
+      const contentMatch = html.match(/<div[^>]*class="[^"]*(?:VDRZ4|post-content|content)[^"]*"[^>]*>[\s\S]*?<\/div>/i);
       if (contentMatch) {
         postContent = contentMatch[0];
+        console.log(`[EXTRACT] Content div found, length: ${postContent.length}`);
       }
     }
 
-    // Extract all image URLs from the post content
-    const imageRegex = /https:\/\/(?:64\.media|media)\.tumblr\.com\/[^"' >]+\.(?:jpg|jpeg|png|gif|webp)/gi;
-    const matches = [...postContent.matchAll(imageRegex)].map(m => m[0]);
+    // Fallback to entire HTML if specific area not found
+    if (!postContent) {
+      console.log(`[EXTRACT] Using entire HTML as fallback`);
+      postContent = html;
+    }
 
-    if (matches.length === 0) {
+    // Extract image URLs only from post content
+    const imageRegex = /https:\/\/(?:64\.media|media|images)\.tumblr\.com\/[^"'<>\s]+\.(?:jpg|jpeg|png|gif|webp|jpe|pnj)/gi;
+    const matches = [...postContent.matchAll(imageRegex)].map(m => m[0]);
+    console.log(`[EXTRACT] Found ${matches.length} image matches`);
+
+    // Remove duplicates
+    const uniqueImages = [...new Set(matches)];
+    console.log(`[EXTRACT] Unique images: ${uniqueImages.length}`);
+
+    if (uniqueImages.length === 0) {
+      console.log(`[EXTRACT] No images found!`);
       return url;
     }
 
-    // Find the largest image (by analyzing size in URL like s1280x1920)
-    let largestImage = matches[0];
+    // Find the largest image by resolution
+    let largestImage = uniqueImages[0];
     let largestSize = 0;
 
-    for (const imageUrl of matches) {
-      const sizeMatch = imageUrl.match(/\/s(\d+)x(\d+)\//);
+    for (const imgUrl of uniqueImages) {
+      const sizeMatch = imgUrl.match(/\/s(\d+)x(\d+)/);
       if (sizeMatch) {
         const width = parseInt(sizeMatch[1]);
         const height = parseInt(sizeMatch[2]);
         const size = width * height;
         if (size > largestSize) {
           largestSize = size;
-          largestImage = imageUrl;
+          largestImage = imgUrl;
         }
       }
     }
@@ -95,7 +123,7 @@ async function extractTumblrImage(url) {
     console.log(`Extracted Tumblr image: ${largestImage}`);
     return largestImage;
   } catch (error) {
-    console.error("Tumblr extraction error:", error);
+    console.error("[EXTRACT] Error:", error.message);
     return url;
   }
 }
@@ -113,6 +141,7 @@ app.post("/upload", express.json(), checkApiKey, async (req, res) => {
     imageUrl = await extractTumblrImage(imageUrl);
 
     // Fetch the image from the server side
+    console.log(`Fetching image URL: ${imageUrl}`);
     const response = await fetch(imageUrl, {
       headers: {
         "Referer": sourceUrl || imageUrl,
@@ -124,19 +153,37 @@ app.post("/upload", express.json(), checkApiKey, async (req, res) => {
       throw new Error(`Failed to fetch image: ${response.statusText}`);
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const contentType = response.headers.get("content-type");
+    console.log(`Response Content-Type: ${contentType}`);
 
-    // Extract filename from URL
+    const buffer = Buffer.from(await response.arrayBuffer());
+    console.log(`Fetched buffer size: ${buffer.length} bytes`);
+
+    // Extract filename from URL (without extension, as we'll use .jpg)
     const urlObj = new URL(imageUrl);
-    const rawName = urlObj.pathname.split("/").pop() || "image.jpg";
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+    const rawName = urlObj.pathname.split("/").pop() || "image";
     const nameParts = rawName.split(".");
-    const ext = nameParts.length > 1 ? nameParts.pop() : "jpg";
-    const name = nameParts.join(".");
-    const filename = `${name}_${timestamp}.${ext}`;
+    const name = nameParts[0] || "image";
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+    const filename = `${name}_${timestamp}.jpg`;
+
+    // Convert image to JPEG
+    console.log(`Converting to JPEG with filename: ${filename}`);
+    let jpegBuffer;
+    try {
+      jpegBuffer = await sharp(buffer)
+        .jpeg({ quality: 85, progressive: true })
+        .toBuffer();
+      console.log(`Converted buffer size: ${jpegBuffer.length} bytes`);
+    } catch (sharpError) {
+      console.error(`Sharp conversion failed: ${sharpError.message}`);
+      // If conversion fails, fall back to saving original
+      jpegBuffer = buffer;
+      console.log(`Falling back to original buffer (${jpegBuffer.length} bytes)`);
+    }
 
     const filepath = path.join(NETWORK_DRIVE_PATH, filename);
-    fs.writeFileSync(filepath, buffer);
+    fs.writeFileSync(filepath, jpegBuffer);
 
     console.log(`Image saved: ${filepath}`);
 
