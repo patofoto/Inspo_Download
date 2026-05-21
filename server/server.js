@@ -51,9 +51,25 @@ async function extractTumblrImage(url) {
 
     const html = await response.text();
 
-    // Extract all image URLs from Tumblr post
+    // Try to find the main post content area (not header/profile)
+    // Tumblr post content is typically in article or main content sections
+    let postContent = html;
+
+    // Look for main post content patterns
+    const postMatch = html.match(/<article[^>]*>[\s\S]*?<\/article>/i);
+    if (postMatch) {
+      postContent = postMatch[0];
+    } else {
+      // Fallback: look for divs with post-related classes
+      const contentMatch = html.match(/<div[^>]*(?:class|id)="[^"]*(?:post|content|body)[^"]*"[^>]*>[\s\S]*?<\/div>/i);
+      if (contentMatch) {
+        postContent = contentMatch[0];
+      }
+    }
+
+    // Extract all image URLs from the post content
     const imageRegex = /https:\/\/(?:64\.media|media)\.tumblr\.com\/[^"' >]+\.(?:jpg|jpeg|png|gif|webp)/gi;
-    const matches = [...html.matchAll(imageRegex)].map(m => m[0]);
+    const matches = [...postContent.matchAll(imageRegex)].map(m => m[0]);
 
     if (matches.length === 0) {
       return url;
