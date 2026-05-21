@@ -51,15 +51,33 @@ async function extractTumblrImage(url) {
 
     const html = await response.text();
 
-    // Extract image URL from Tumblr post
-    const match = html.match(/https:\/\/(?:64\.media|media)\.tumblr\.com\/[^"' >]+\.(?:jpg|jpeg|png|gif|webp)/i);
+    // Extract all image URLs from Tumblr post
+    const imageRegex = /https:\/\/(?:64\.media|media)\.tumblr\.com\/[^"' >]+\.(?:jpg|jpeg|png|gif|webp)/gi;
+    const matches = [...html.matchAll(imageRegex)].map(m => m[0]);
 
-    if (match) {
-      console.log(`Extracted Tumblr image: ${match[0]}`);
-      return match[0];
+    if (matches.length === 0) {
+      return url;
     }
 
-    return url;
+    // Find the largest image (by analyzing size in URL like s1280x1920)
+    let largestImage = matches[0];
+    let largestSize = 0;
+
+    for (const imageUrl of matches) {
+      const sizeMatch = imageUrl.match(/\/s(\d+)x(\d+)\//);
+      if (sizeMatch) {
+        const width = parseInt(sizeMatch[1]);
+        const height = parseInt(sizeMatch[2]);
+        const size = width * height;
+        if (size > largestSize) {
+          largestSize = size;
+          largestImage = imageUrl;
+        }
+      }
+    }
+
+    console.log(`Extracted Tumblr image: ${largestImage}`);
+    return largestImage;
   } catch (error) {
     console.error("Tumblr extraction error:", error);
     return url;
