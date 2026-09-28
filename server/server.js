@@ -2,6 +2,7 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const cors = require("cors");
+const crypto = require("crypto");
 const sharp = require("sharp");
 
 const app = express();
@@ -10,9 +11,13 @@ const port = process.env.PORT || 3000;
 // Configuration - adjust these for your setup
 const API_KEY = process.env.API_KEY;
 const NETWORK_DRIVE_PATH = process.env.NETWORK_DRIVE_PATH || "/mnt/network-drive/images";
-const TUMBLR_COOKIE = process.env.TUMBLR_COOKIE || "";
+// Tumblr API app credentials (https://www.tumblr.com/oauth/apps). The OAuth
+// token lets the API see login-only blogs; without it only public posts work
+const TUMBLR_CONSUMER_KEY = process.env.TUMBLR_CONSUMER_KEY || "";
+const TUMBLR_CONSUMER_SECRET = process.env.TUMBLR_CONSUMER_SECRET || "";
+const TUMBLR_OAUTH_TOKEN = process.env.TUMBLR_OAUTH_TOKEN || "";
+const TUMBLR_OAUTH_TOKEN_SECRET = process.env.TUMBLR_OAUTH_TOKEN_SECRET || "";
 const FETCH_TIMEOUT_MS = 30000;
-const MAX_REDIRECTS = 5;
 
 // Create directory if it doesn't exist
 if (!fs.existsSync(NETWORK_DRIVE_PATH)) {
@@ -59,34 +64,116 @@ function isTumblrPostUrl(url) {
   return isTumblrHost(hostname) && !isMediaHost;
 }
 
-// Follow redirects by hand: fetch drops the Cookie header on cross-origin
-// redirects (e.g. blog.tumblr.com -> www.tumblr.com), and this way the
-// cookie is only ever sent to Tumblr hosts
-async function fetchTumblrPage(url) {
-  let currentUrl = url;
+// Blog name and post ID from a Tumblr post link, e.g.
+// www.tumblr.com/{blog}/{id}/slug or {blog}.tumblr.com/post/{id}/slug
+function parseTumblrPostUrl(url) {
+  const { hostname, pathname } = new URL(url);
+  const segments = pathname.split("/").filter(Boolean);
+  const isPostId = segment => /^\d+$/.test(segment || "");
 
-  for (let i = 0; i <= MAX_REDIRECTS; i++) {
-    const sendCookie = TUMBLR_COOKIE && isTumblrHost(new URL(currentUrl).hostname);
-    const response = await fetch(currentUrl, {
-      redirect: "manual",
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        ...(sendCookie ? { "Cookie": TUMBLR_COOKIE } : {})
-      },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
-    });
-
-    const location = response.headers.get("location");
-    if (response.status < 300 || response.status >= 400 || !location) {
-      return { response, finalUrl: currentUrl };
-    }
-
-    await response.body?.cancel();
-    currentUrl = new URL(location, currentUrl).href;
-    console.log(`[EXTRACT] Redirected to: ${currentUrl}`);
+  if (hostname === "www.tumblr.com" || hostname === "tumblr.com") {
+    return isPostId(segments[1]) ? { blog: segments[0], id: segments[1] } : null;
   }
 
-  throw new Error("Too many redirects fetching Tumblr post");
+  const blog = hostname.slice(0, -".tumblr.com".length);
+  if (!blog.includes(".") && ["post", "image"].includes(segments[0]) && isPostId(segments[1])) {
+    return { blog, id: segments[1] };
+  }
+
+  return null;
+}
+
+// RFC 3986 percent-encoding, as OAuth 1.0a signatures require
+function oauthEncode(value) {
+  return encodeURIComponent(value).replace(/[!'()*]/g, c => "%" + c.charCodeAt(0).toString(16).toUpperCase());
+}
+
+// OAuth 1.0a (HMAC-SHA1) Authorization header for a Tumblr API GET request
+function tumblrOAuthHeader(url) {
+  const { origin, pathname, searchParams } = new URL(url);
+  const oauth = {
+    oauth_consumer_key: TUMBLR_CONSUMER_KEY,
+    oauth_nonce: crypto.randomBytes(16).toString("hex"),
+    oauth_signature_method: "HMAC-SHA1",
+    oauth_timestamp: String(Math.floor(Date.now() / 1000)),
+    oauth_token: TUMBLR_OAUTH_TOKEN,
+    oauth_version: "1.0"
+  };
+
+  const params = [...searchParams.entries(), ...Object.entries(oauth)]
+    .map(([k, v]) => [oauthEncode(k), oauthEncode(v)])
+    .sort(([k1, v1], [k2, v2]) => (k1 === k2 ? (v1 < v2 ? -1 : 1) : (k1 < k2 ? -1 : 1)))
+    .map(([k, v]) => `${k}=${v}`)
+    .join("&");
+  const baseString = ["GET", oauthEncode(origin + pathname), oauthEncode(params)].join("&");
+  const signingKey = `${oauthEncode(TUMBLR_CONSUMER_SECRET)}&${oauthEncode(TUMBLR_OAUTH_TOKEN_SECRET)}`;
+  oauth.oauth_signature = crypto.createHmac("sha1", signingKey).update(baseString).digest("base64");
+
+  return "OAuth " + Object.entries(oauth).map(([k, v]) => `${oauthEncode(k)}="${oauthEncode(v)}"`).join(", ");
+}
+
+// Fetch a post (NPF format) through Tumblr's API. Signed with the OAuth
+// token it sees what the authorized account sees, including login-only
+// blogs, and the token doesn't expire; with just the consumer key it only
+// sees public blogs
+async function fetchTumblrApiPost(blog, id) {
+  const url = new URL(`https://api.tumblr.com/v2/blog/${blog}.tumblr.com/posts`);
+  url.searchParams.set("id", id);
+  url.searchParams.set("npf", "true");
+
+  const headers = {};
+  if (TUMBLR_OAUTH_TOKEN) {
+    headers.Authorization = tumblrOAuthHeader(url.href);
+  } else {
+    url.searchParams.set("api_key", TUMBLR_CONSUMER_KEY);
+  }
+
+  const response = await fetch(url, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  const body = await response.json().catch(() => ({}));
+  const apiError = body.errors?.[0];
+
+  // Login-only blog. Tumblr quietly treats a badly signed request as logged
+  // out, so with a token set this usually means a wrong TUMBLR_* value
+  if (apiError?.code === 4012) {
+    throw httpError(422, TUMBLR_OAUTH_TOKEN
+      ? "This blog is only visible to logged-in Tumblr accounts and Tumblr didn't accept the login - check the TUMBLR_* variables on the server"
+      : "This blog is only visible to logged-in Tumblr accounts - set the TUMBLR_OAUTH_* variables on the server");
+  }
+  if (response.status === 404) {
+    throw httpError(422, "Tumblr post not found");
+  }
+  if (!response.ok) {
+    throw new Error(`Tumblr API error: ${response.status} ${apiError?.detail || response.statusText}`);
+  }
+
+  const post = body.response?.posts?.[0];
+  if (!post) {
+    throw httpError(422, "Tumblr post not found");
+  }
+  return post;
+}
+
+// Largest version of each image in a post (NPF format), in display order:
+// reblog trail first, then the reblogger's own content
+function postImages(post) {
+  const blocks = [
+    ...(post.trail || []).flatMap(item => item.content || []),
+    ...(post.content || [])
+  ];
+
+  return blocks
+    .filter(block => block.type === "image" && Array.isArray(block.media) && block.media.length)
+    .map(block => block.media.reduce((a, b) => ((b.width || 0) > (a.width || 0) ? b : a)).url)
+    .filter(Boolean);
+}
+
+function firstPostImage(images) {
+  console.log(`[EXTRACT] Post has ${images.length} image(s)`);
+  if (images.length === 0) {
+    throw httpError(422, "No images found in Tumblr post");
+  }
+  console.log(`Extracted Tumblr image: ${images[0]}`);
+  return images[0];
 }
 
 // Tumblr's web app embeds its page data as JSON, including the post's
@@ -101,29 +188,16 @@ function parseTumblrState(html) {
   }
 }
 
-// Largest version of each image in the post, in display order (reblog
-// trail first, then the reblogger's own content). Returns null if the
-// post isn't in the page data at all
-function findPostImages(state, postUrl) {
+// The post a Tumblr page is about, from its embedded page data
+function findPostInState(state, postUrl) {
   const posts = state?.PeeprRoute?.initialTimeline?.objects || [];
   const postId = new URL(postUrl).pathname.split("/").find(segment => /^\d+$/.test(segment));
-  const post = postId ? posts.find(p => String(p.id) === postId) : posts[0];
-  if (!post) return null;
-
-  const blocks = [
-    ...(post.trail || []).flatMap(item => item.content || []),
-    ...(post.content || [])
-  ];
-
-  return blocks
-    .filter(block => block.type === "image" && Array.isArray(block.media) && block.media.length)
-    .map(block => block.media.reduce((a, b) => ((b.width || 0) > (a.width || 0) ? b : a)).url)
-    .filter(Boolean);
+  return (postId ? posts.find(p => String(p.id) === postId) : posts[0]) || null;
 }
 
-// Extract image URL from Tumblr post HTML. Non-Tumblr URLs and direct
-// Tumblr image links are returned as-is; a Tumblr post we can't get an
-// image from throws, so the post page is never saved as an "image"
+// Extract image URL from a Tumblr post. Non-Tumblr URLs and direct Tumblr
+// image links are returned as-is; a Tumblr post we can't get an image from
+// throws, so the post page is never saved as an "image"
 async function extractTumblrImage(url) {
   if (!isTumblrPostUrl(url)) {
     return url;
@@ -131,15 +205,30 @@ async function extractTumblrImage(url) {
 
   console.log(`[EXTRACT] Starting extraction for: ${url.substring(0, 60)}...`);
 
-  // Fetch the Tumblr post HTML
-  console.log(`[EXTRACT] Fetching HTML...`);
-  const { response, finalUrl } = await fetchTumblrPage(url);
+  // Prefer Tumblr's API: it separates the post's images from everything
+  // else on the page and, with the OAuth token, sees login-only blogs
+  const postRef = parseTumblrPostUrl(url);
+  if (postRef && TUMBLR_CONSUMER_KEY) {
+    console.log(`[EXTRACT] Fetching post ${postRef.id} from ${postRef.blog} via API...`);
+    const post = await fetchTumblrApiPost(postRef.blog, postRef.id);
+    return firstPostImage(postImages(post));
+  }
+  if (!postRef) {
+    console.log(`[EXTRACT] Unrecognized post link, reading the page instead`);
+  }
 
-  if (finalUrl.includes("/login_required/")) {
+  // Otherwise read the post page, which only works for public blogs
+  console.log(`[EXTRACT] Fetching HTML...`);
+  const response = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+  });
+
+  if (response.url.includes("/login_required/")) {
     console.log(`[EXTRACT] Redirected to login wall`);
-    throw httpError(422, TUMBLR_COOKIE
-      ? "Tumblr requires login for this post - TUMBLR_COOKIE may have expired"
-      : "Tumblr requires login for this post - set TUMBLR_COOKIE on the server");
+    throw httpError(422, TUMBLR_OAUTH_TOKEN
+      ? "Tumblr requires login for this post"
+      : "Tumblr requires login for this post - set the TUMBLR_* API variables on the server");
   }
 
   if (!response.ok) {
@@ -150,20 +239,12 @@ async function extractTumblrImage(url) {
   console.log(`[EXTRACT] Got HTML, length: ${html.length}`);
 
   // Prefer the embedded post data: it separates the post's images from
-  // the blog header and avatars, whether or not we're logged in
+  // the blog header and avatars
   const state = parseTumblrState(html);
   if (state) {
-    if (TUMBLR_COOKIE && state.isLoggedIn?.isLoggedIn === false) {
-      console.log(`[EXTRACT] Warning: Tumblr is not accepting TUMBLR_COOKIE (page is logged out)`);
-    }
-    const postImages = findPostImages(state, finalUrl);
-    if (postImages) {
-      console.log(`[EXTRACT] Post data: ${postImages.length} image(s)`);
-      if (postImages.length === 0) {
-        throw httpError(422, "No images found in Tumblr post");
-      }
-      console.log(`Extracted Tumblr image: ${postImages[0]}`);
-      return postImages[0];
+    const post = findPostInState(state, response.url);
+    if (post) {
+      return firstPostImage(postImages(post));
     }
     console.log(`[EXTRACT] Post not found in page data, scanning HTML...`);
   }
