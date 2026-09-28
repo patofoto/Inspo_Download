@@ -1,6 +1,6 @@
 # Inspo Download
 
-Clients that send images to the **Inspiration Board** folder (the one Immich reads) through the image-downloader server.
+Browser and phone tools for the **Inspiration Board** folder (an Immich external library): saving images into it through the image-downloader server, and telling Immich to rescan it.
 
 The server is not in this repo. It lives in [`homelab-config/image-downloader-m1`](https://github.com/patofoto/homelab-config/tree/main/image-downloader-m1) and runs on the Mac mini as the Portainer stack `image-downloader-m1`, reachable at `https://inspo-dl.make3.co`.
 
@@ -10,7 +10,7 @@ The server is not in this repo. It lives in [`homelab-config/image-downloader-m1
 | --- | --- |
 | `extension/` | Chrome extension: right-click an image → **Download to Network Drive** |
 | `scriptable/` | iOS Scriptable script: share a link → send it to the server |
-| `webhook-trigger/` | Separate Chrome extension that fires a webhook from the toolbar (not part of image saving) |
+| `webhook-trigger/` | Chrome extension: a toolbar button that calls an n8n webhook, which starts an Immich external library scan so newly saved images show up |
 
 On the iPhone, the **Inspo Board** Shortcut in the share sheet does the same job as the Scriptable script: it POSTs the shared link to `/upload` and shows the server's reply as a notification.
 
@@ -20,6 +20,10 @@ On the iPhone, the **Inspo Board** Shortcut in the share sheet does the same job
 
 1. Open `chrome://extensions/`, turn on **Developer mode**, click **Load unpacked**, pick `extension/`.
 2. Open the extension's **Options**: Server URL `https://inspo-dl.make3.co`, API key = the server's `API_KEY`.
+
+### Webhook trigger
+
+Load `webhook-trigger/` the same way. In its **Options**, set the Webhook URL to the n8n workflow's webhook. Clicking the toolbar button sends it a GET; the badge shows `✓` or `✗`.
 
 ### Scriptable
 

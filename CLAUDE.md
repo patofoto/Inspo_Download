@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Clients for the image-downloader server, which saves images into the Inspiration Board folder on the Mac mini:
+Browser and phone tools for the Inspiration Board folder on the Mac mini (an Immich external library):
 
-1. **Chrome extension** (`extension/`) - right-click an image → POST its URL to the server
-2. **Scriptable** (`scriptable/InspoDownload.js`) - iOS share-sheet script that POSTs a shared link
-3. **Webhook trigger** (`webhook-trigger/`) - independent Chrome extension, unrelated to image saving
+1. **Chrome extension** (`extension/`) - right-click an image → POST its URL to the image-downloader server
+2. **Scriptable** (`scriptable/InspoDownload.js`) - iOS share-sheet script that POSTs a shared link to the server
+3. **Webhook trigger** (`webhook-trigger/`) - toolbar button that GETs a configured webhook URL; the user points it at an n8n workflow that starts an Immich external library scan, so newly saved images show up. The URL lives only in the extension's options (chrome.storage), not in code
 
 The user's iPhone mainly uses an iOS Shortcut ("Inspo Board", not in this repo) that does the same as the Scriptable script.
 
