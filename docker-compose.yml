@@ -9,6 +9,7 @@ services:
     environment:
       NETWORK_DRIVE_PATH: /downloads
       API_KEY: ${API_KEY}
+      TUMBLR_COOKIE: ${TUMBLR_COOKIE}
       NODE_ENV: production
     volumes:
       - ./server/server.js:/app/server.js

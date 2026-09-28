@@ -20,21 +20,10 @@ if (!sharedUrl) {
   return
 }
 
+// Send Tumblr post URLs as-is - the server extracts the image
+// (with the logged-in cookie, skipping avatars)
 let imageUrl = sharedUrl
 let sourceUrl = sharedUrl
-
-// If it's a Tumblr post URL, try to extract the first image
-if (sharedUrl.includes("tumblr.com/post") || sharedUrl.includes("tumblr.com/image")) {
-  try {
-    let req = new Request(sharedUrl)
-    req.headers = { "User-Agent": "Mozilla/5.0" }
-    let html = await req.loadString()
-    let match = html.match(/https:\/\/(?:64\.media|media)\.tumblr\.com\/[^"' >]+\.(?:jpg|jpeg|png|gif|webp)/i)
-    if (match) imageUrl = match[0]
-  } catch(e) {
-    // fall through - use original URL
-  }
-}
 
 // Confirm before sending
 let confirm = new Alert()
