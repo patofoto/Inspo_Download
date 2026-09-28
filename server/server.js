@@ -89,6 +89,38 @@ async function fetchTumblrPage(url) {
   throw new Error("Too many redirects fetching Tumblr post");
 }
 
+// Tumblr's web app embeds its page data as JSON, including the post's
+// content blocks with every image size
+function parseTumblrState(html) {
+  const match = html.match(/<script[^>]*id="___INITIAL_STATE___"[^>]*>([\s\S]*?)<\/script>/i);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+// Largest version of each image in the post, in display order (reblog
+// trail first, then the reblogger's own content). Returns null if the
+// post isn't in the page data at all
+function findPostImages(state, postUrl) {
+  const posts = state?.PeeprRoute?.initialTimeline?.objects || [];
+  const postId = new URL(postUrl).pathname.split("/").find(segment => /^\d+$/.test(segment));
+  const post = postId ? posts.find(p => String(p.id) === postId) : posts[0];
+  if (!post) return null;
+
+  const blocks = [
+    ...(post.trail || []).flatMap(item => item.content || []),
+    ...(post.content || [])
+  ];
+
+  return blocks
+    .filter(block => block.type === "image" && Array.isArray(block.media) && block.media.length)
+    .map(block => block.media.reduce((a, b) => ((b.width || 0) > (a.width || 0) ? b : a)).url)
+    .filter(Boolean);
+}
+
 // Extract image URL from Tumblr post HTML. Non-Tumblr URLs and direct
 // Tumblr image links are returned as-is; a Tumblr post we can't get an
 // image from throws, so the post page is never saved as an "image"
@@ -116,6 +148,25 @@ async function extractTumblrImage(url) {
 
   const html = await response.text();
   console.log(`[EXTRACT] Got HTML, length: ${html.length}`);
+
+  // Prefer the embedded post data: it separates the post's images from
+  // the blog header and avatars, whether or not we're logged in
+  const state = parseTumblrState(html);
+  if (state) {
+    if (TUMBLR_COOKIE && state.isLoggedIn?.isLoggedIn === false) {
+      console.log(`[EXTRACT] Warning: Tumblr is not accepting TUMBLR_COOKIE (page is logged out)`);
+    }
+    const postImages = findPostImages(state, finalUrl);
+    if (postImages) {
+      console.log(`[EXTRACT] Post data: ${postImages.length} image(s)`);
+      if (postImages.length === 0) {
+        throw httpError(422, "No images found in Tumblr post");
+      }
+      console.log(`Extracted Tumblr image: ${postImages[0]}`);
+      return postImages[0];
+    }
+    console.log(`[EXTRACT] Post not found in page data, scanning HTML...`);
+  }
 
   // Find the post content area (article tag or post content div)
   let postContent = "";
