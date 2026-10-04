@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../homelab-config/image-downloader-m1"
+		}
+	],
+	"settings": {}
+}
