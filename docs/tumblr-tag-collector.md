@@ -134,6 +134,8 @@ What a page contains:
 1. **Server batch, dry run:** data folder, ledger, `POST /batch` that only classifies. Verify against the Marta Bevacqua results.
    ✅ Done Oct 4, 2026 (homelab-config `efe5278`, branch only). Test on the 52 Marta Bevacqua images plus seeded ledger and file names: 41 new, 3 downloaded before, 9 repeats, 1 invalid — all as predicted. Listing the real Inspiration Board (129k files) takes under a second.
 2. **Extension collector:** tag page → list → server → preview.
+   ✅ Code done Oct 4, 2026 (Inspo_Download `bd21093`). Collection tested on `#marta bevacqua` with a stand-in server: 135 pages, 1,071 posts, 1,453 photos. End-to-end with the real server needs the first deploy.
+   Note: Chrome pauses tabs left in the background, so collecting needs the tab in front (about a minute per 1,000 posts).
 3. **Server download queue:** sequential downloads, ledger, progress.
 4. **First real run** on `marta bevacqua`, watching memory (`docker stats`).
 
