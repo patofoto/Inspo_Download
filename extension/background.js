@@ -49,6 +49,37 @@ async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey) {
   }
 }
 
+// Tag runs: the collector (collector.js, running in a Tumblr tab) hands its list to the
+// server through here, so the server URL and API key stay in the extension's storage.
+const BATCH_ROUTES = {
+  "inspo-batch-create": (msg) => ["POST", "/batch", { tag: msg.tag, items: msg.items }],
+  "inspo-batch-status": (msg) => ["GET", `/batch/${encodeURIComponent(msg.id)}`],
+  "inspo-batch-cancel": (msg) => ["POST", `/batch/${encodeURIComponent(msg.id)}/cancel`]
+};
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  const route = BATCH_ROUTES[msg?.type];
+  if (!route) return false;
+  batchRequest(...route(msg)).then(
+    (data) => sendResponse({ ok: true, data }),
+    (error) => sendResponse({ ok: false, error: error.message })
+  );
+  return true; // reply comes asynchronously
+});
+
+async function batchRequest(method, path, body) {
+  const { serverUrl, apiKey } = await chrome.storage.local.get(["serverUrl", "apiKey"]);
+  if (!serverUrl || !apiKey) throw new Error("Set the server URL and API key in the extension's options first.");
+  const response = await fetch(`${serverUrl}${path}`, {
+    method,
+    headers: { "X-API-Key": apiKey, ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `The server answered HTTP ${response.status}.`);
+  return data;
+}
+
 function showBadge(text, color) {
   chrome.action.setBadgeText({ text });
   chrome.action.setBadgeBackgroundColor({ color });

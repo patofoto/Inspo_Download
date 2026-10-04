@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Inspo</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      width: 280px;
+      margin: 0;
+      padding: 14px 16px 12px;
+      color: #333;
+      font-size: 13px;
+    }
+    h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+    }
+    .tag {
+      font-weight: 600;
+      word-break: break-word;
+    }
+    input {
+      width: 100%;
+      padding: 7px 9px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+    }
+    input:focus {
+      outline: none;
+      border-color: #1a73e8;
+    }
+    button {
+      width: 100%;
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1558b0;
+    }
+    .hint {
+      font-size: 12px;
+      color: #888;
+      margin: 6px 0 0;
+    }
+    .error {
+      color: #c62828;
+    }
+    .footer {
+      margin-top: 12px;
+      text-align: right;
+    }
+    .footer a {
+      font-size: 12px;
+      color: #1a73e8;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    [hidden] {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>Collect a Tumblr tag</h2>
+
+  <div id="onTag" hidden>
+    <div>Tag: <span class="tag" id="tagName"></span></div>
+    <button id="collect">Collect this tag</button>
+    <p class="hint">Gathers every photo from the tag's Latest view, then shows what's new before anything is downloaded.</p>
+  </div>
+
+  <div id="offTag" hidden>
+    <input type="text" id="name" placeholder="Model or photographer, e.g. Marta Bevacqua" />
+    <button id="open">Open tag page</button>
+    <p class="hint">Opens the tag on Tumblr. Then click this button again to collect it.</p>
+  </div>
+
+  <p class="hint error" id="error" hidden></p>
+
+  <div class="footer"><a id="settings">Settings</a></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,13 +1,17 @@
 {
   "manifest_version": 3,
   "name": "Image Downloader to Network Drive",
-  "version": "1.0",
-  "description": "Right-click on images to download them to your network drive",
+  "version": "1.1",
+  "description": "Right-click on images to download them to your network drive, or collect a whole Tumblr tag",
   "permissions": [
     "contextMenus",
-    "storage"
+    "storage",
+    "scripting"
   ],
-  "action": {},
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Collect a Tumblr tag"
+  },
   "host_permissions": [
     "<all_urls>"
   ],
