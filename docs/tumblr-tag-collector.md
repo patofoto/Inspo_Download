@@ -165,6 +165,8 @@ So ≤ 20 bits leaves a wide margin on both sides. 6 photos were uploaded 2–3 
 
 ## Later
 
+- Immich albums per photographer: an "Add to Immich album" box in the preview (pre-filled with the tag), and after the download the server waits for Immich to pick up the files, then creates/finds the album and adds them via Immich's API (API key limited to album permissions; scan started by the server or by the webhook-trigger button). Face names for models are left to Immich's own recognition: name a model once and new photos follow; automating names from a tag is too error-prone. Open questions: pre-fill the album name or not, who starts the scan, albums for model runs too.
+
 - Drawings and animation stills end up in runs alongside photos. For now they're found manually with Immich's Smart Search (`drawing`, `illustration`, `anime`, `cartoon`). Options if this moves into the workflow: skip posts by specific tags (`#anime`, `#animation`, `#illustration`, `#drawing`, `#fanart`, `#cartoon`; not `#art`, which real photos use too), and/or classify each thumbnail with Immich's ML service ("a photograph" vs "a drawing / anime still / cartoon"; same model as Smart Search, no database search, ~0.1–0.3 s per image, model held in memory during the check).
 
 
