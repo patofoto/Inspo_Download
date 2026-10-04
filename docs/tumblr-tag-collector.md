@@ -159,8 +159,11 @@ On the 52 Marta Bevacqua images, 256-bit difference hashes of the ~540 px thumbn
 
 So ≤ 20 bits leaves a wide margin on both sides. 6 photos were uploaded 2–3 times each: 52 images → 44 downloads. A 64-bit hash was too coarse (different photos at 0–1 bits apart). The cutoff is a setting (`REPEAT_MAX_BITS`) in case larger runs need tuning.
 
+## Also done (Oct 4, 2026)
+
+- Single saves (right-click, phone) now skip a Tumblr image that's already saved, using the same ledger and file-name check (homelab-config `338bd69`). That morning, 12 single saves had duplicated files from March.
+
 ## Later
 
-- Single saves (right-click, phone) don't check whether the image is already on the drive; on Oct 4, 12 images saved that morning duplicated files from March. They could use the same ledger and file-name check as tag runs.
 
 - The official tag API as a fallback if Tumblr changes its internal API (public posts only).

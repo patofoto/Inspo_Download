@@ -35,10 +35,14 @@ async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey) {
       throw new Error(err.error || response.statusText);
     }
 
-    await response.json();
+    const data = await response.json();
 
-    // Show green checkmark for 3 seconds
-    showBadge("✓", "#4caf50");
+    // Green checkmark for 3 seconds; a grey "=" when the image was already saved before
+    if (data.count === 0 && data.alreadySaved) {
+      showBadge("=", "#757575");
+    } else {
+      showBadge("✓", "#4caf50");
+    }
     setTimeout(() => showBadge("", "#4caf50"), 3000);
 
   } catch (error) {

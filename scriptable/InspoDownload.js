@@ -46,7 +46,10 @@ request.body = JSON.stringify({ imageUrl, sourceUrl })
 let resultAlert = new Alert()
 try {
   let res = await request.loadJSON()
-  if (res.success) {
+  if (res.success && res.count === 0 && res.alreadySaved) {
+    resultAlert.title = "Already saved"
+    resultAlert.message = res.message || "This image is already in the Inspiration Board."
+  } else if (res.success) {
     resultAlert.title = "Saved!"
     resultAlert.message = res.filename || "Image downloaded."
   } else {

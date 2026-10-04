@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Browser and phone tools for the Inspiration Board folder on the Mac mini (an Immich external library):
 
-1. **Chrome extension** (`extension/`) - right-click an image → POST its URL to the image-downloader server
+1. **Chrome extension** (`extension/`) - right-click an image → POST its URL to the image-downloader server; toolbar popup → collect a whole Tumblr tag (`popup.js`, `collector.js`) and download it through the server's `/batch` endpoints
 2. **Scriptable** (`scriptable/InspoDownload.js`) - iOS share-sheet script that POSTs a shared link to the server
 3. **Webhook trigger** (`webhook-trigger/`) - toolbar button that GETs a configured webhook URL; the user points it at an n8n workflow that starts an Immich external library scan, so newly saved images show up. The URL lives only in the extension's options (chrome.storage), not in code
 
@@ -31,6 +31,20 @@ Right-click image → extension/background.js
 ```
 
 The server fetches the image itself, which avoids CORS issues in the browser.
+
+## Flow (Tumblr tag collector)
+
+```text
+Toolbar popup on tumblr.com/tagged/<tag> → injects extension/collector.js into the tab
+  → pages through /api/v2/hubs/<tag>/timeline?sort=recent (Tumblr's internal API, logged-in
+    session; next page in response.timeline._links.next) → photos only, merged by media key
+  → background.js relays to the server: POST /batch → poll GET /batch/:id → preview
+  → POST /batch/:id/download → poll until done (runs on the server; the panel can close)
+```
+
+- Plan, findings and calibration: `docs/tumblr-tag-collector.md`
+- Chrome pauses background tabs, so collecting needs the tab in front; pauses use `pause()`, which ends early when the tab becomes visible.
+- The server skips images downloaded before (ledger of media keys, existing file names) and re-uploads of the same photo (256-bit difference hash of the ~540 px thumbnail, ≤ 20 bits apart). It never talks to Immich.
 
 ## Development
 
