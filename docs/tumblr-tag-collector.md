@@ -136,6 +136,7 @@ What a page contains:
 2. **Extension collector:** tag page → list → server → preview.
    ✅ Code done Oct 4, 2026 (Inspo_Download `bd21093`). Collection tested on `#marta bevacqua` with a stand-in server: 135 pages, 1,071 posts, 1,453 photos. End-to-end with the real server needs the first deploy.
    Note: Chrome pauses tabs left in the background, so collecting needs the tab in front (about a minute per 1,000 posts).
+   ✅ First real run Oct 4, 2026 after deploying the server part to `main` (homelab-config `efe5278`): `#Carlos Nunez`, 852 photos → 557 new, 20 downloaded before (by file name; the ledger was still empty), 275 repeats across 136 photos (up to 15 copies each). Server check: 2 min 39 s, 0 thumbnail errors, ~100 MB memory. Every repeat pair 8–16 bits apart (34) and a sample of 0-bit pairs checked by eye: all the same photo, some recolored or black-and-white edits. No false matches.
 3. **Server download queue:** sequential downloads, ledger, progress.
 4. **First real run** on `marta bevacqua`, watching memory (`docker stats`).
 
