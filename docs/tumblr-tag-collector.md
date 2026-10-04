@@ -39,7 +39,7 @@ What a page contains:
 - The same photo **re-uploaded** by another blog gets a new media key. Only visual matching catches those.
 - File names can't be relied on: in a 52-image test, only 1 matched an existing file in the Inspiration Board by name.
 
-### Duplicate check against Immich (tested, read-only)
+### Duplicate check against Immich (tested, read-only; not used, see Settled questions)
 
 - Immich 3.2.4 already has a Smart Search embedding for every Inspiration Board image (123k, model `ViT-B-16-SigLIP2__webli`, 768 dimensions, table `smart_search`).
 - Method: send Tumblr's ~540 px thumbnail to Immich's ML service (`POST /predict`, same model), then find the nearest neighbour in `smart_search` (cosine distance, `<=>`).
@@ -64,22 +64,32 @@ What a page contains:
 
 1. **Source:** the tag page's Latest view, collected by the extension inside the logged-in browser.
 2. **Selection:** download everything; culling happens in Immich.
-3. **Duplicates:** check before download using Immich's existing embeddings. Skip only below **0.035**; when unsure, download.
-4. **Order:** check everything first, show a preview, download only after confirmation. One phase at a time, one item at a time, so the ML model is loaded only during the check (minutes), not during the download (up to an hour).
+3. **Duplicates:** avoid downloading the same Tumblr image twice, using cheap checks only (below). **No comparison against Immich's database**: it cost 0.35–0.8 s of database CPU per image on an already busy server. Images already in Immich get deleted from Immich's duplicate review instead.
+4. **Order:** collect, check, preview, then download only after confirmation. Downloads run one at a time.
 5. **No new tools:** Immich's built-in duplicate review handles what's left. immich-deduper was reviewed and set aside.
 6. **One exact tag per run**, as typed. No merging of spellings like `martabevacqua`.
-7. **No size filter.** Small unique images are kept; smaller copies of existing images are left to Immich's duplicate review.
+7. **No size filter.** Small unique images are kept; smaller copies are left to Immich's duplicate review.
 8. **Immich scan is triggered by you** (webhook-trigger button) after a run, not by the server.
 
 ## Flow
 
 ```text
-1. Collect   (browser)  tag page → all posts → drop ads, GIFs, text → merge by media key
-2. Check     (server)   per image: already downloaded? → in Immich (< 0.035)? → repeat within batch?
-3. Preview   (extension) "1,422 found · 280 already have · 40 repeats · download 1,102?"  [Download] [Cancel]
-4. Download  (server)   one at a time, existing save pipeline; progress
-5. Scan      (you)      press the webhook-trigger button so Immich picks up the new files
+1. Collect   (browser)   tag page → all posts → drop ads, GIFs, text → merge by media key
+2. Check     (server)    per image: downloaded before? (ledger, existing file name)
+3. Preview   (extension) "1,422 found · 30 downloaded before · download 1,392?"  [Download] [Cancel]
+4. Download  (server)    one at a time, existing save pipeline; progress
+5. Scan      (you)       press the webhook-trigger button; delete leftovers in Immich's duplicate review
 ```
+
+## How duplicates are avoided (no AI, no Immich database)
+
+| Duplicate | Caught by | Where |
+|---|---|---|
+| Reblogs and repeated posts of the same upload | same media key | extension, while collecting |
+| Downloaded in an earlier run | ledger of saved media keys | server |
+| Saved before the ledger existed (~30k files named after Tumblr's file hash) | largest-size file hash matches an existing file name | server |
+| The same photo re-uploaded by another blog | not caught (Immich's duplicate review) | see open question |
+| Already in Immich from other sources | not caught (Immich's duplicate review) | |
 
 ## Extension (Inspo_Download/extension)
 
@@ -101,12 +111,10 @@ What a page contains:
 - `POST /batch/:id/download` → starts downloading the images marked `new`
 - `POST /batch/:id/cancel`
 
-### Check phase (sequential)
+### Check phase (fast, no AI)
 
 1. **Ledger:** has this media key been downloaded before? Skip. The ledger is a new file of media keys the server saved.
-2. **Immich:** fingerprint the thumbnail through the ML service, take the nearest neighbour from `smart_search`. Below 0.035, skip as "already in Immich".
-3. **Within the batch:** compare with candidates already kept in this batch. Below 0.035, keep the higher-resolution one.
-4. If the ML service or database is unreachable, mark the image `unchecked` and download it. The preview says the check was unavailable.
+2. **Existing file names:** list the Inspiration Board once per batch; skip an image whose largest-size file hash (the last path segment of its URL, which the server uses as the file name) is already there.
 
 ### Download phase (sequential)
 
@@ -114,27 +122,28 @@ What a page contains:
 - Add each saved media key to the ledger
 - Keep a short optional pause between downloads
 
-### Connectivity and config
+### Config
 
-- Join the external network `immich-m1_default` (no change to the Immich stack) to reach `immich_machine_learning:3003` and `immich_postgres:5432`.
-- Database access through a **read-only role** with `SELECT` on `asset` and `smart_search` only (approved). Its password lives in Portainer and 1Password.
-- New dependency: `pg`.
-- New env vars: `IMMICH_ML_URL`, `IMMICH_DB_URL`, `DUPLICATE_MAX_DISTANCE` (0.035).
 - Batch state and the ledger live in a host data folder, following the repo convention (`~/image-downloader-m1/` on the Mac mini, mounted at `/data`), so they survive restarts and stay out of the Git checkout.
+- No new dependencies, no access to Immich's network or database.
 
 ## Milestones
 
-1. **Server check, dry run:** connectivity, read-only role, `POST /batch` that only classifies. Verify against the Marta Bevacqua results.
+1. **Server batch, dry run:** data folder, ledger, `POST /batch` that only classifies. Verify against the Marta Bevacqua results.
 2. **Extension collector:** tag page → list → server → preview.
 3. **Server download queue:** sequential downloads, ledger, progress.
-4. **First real run** on `marta bevacqua`, watching memory (`docker stats`) and tuning the threshold if needed.
+4. **First real run** on `marta bevacqua`, watching memory (`docker stats`).
 
 ## Settled questions (Oct 4, 2026)
 
 - **Immich scan:** triggered manually with the webhook-trigger button; the server doesn't call it.
-- **Read-only database role:** approved.
 - **Small images:** not filtered.
 - **Tag variants:** one exact tag per run, as typed.
+- **Comparison with Immich's database:** dropped. It worked (10 of 10 duplicates found, no false skips below distance 0.035), but cost 0.35–0.8 s of database CPU per image because Immich's vector index is a single cluster. The read-only role `inspo_reader` created for it is no longer needed.
+
+## Open question
+
+- **Re-uploads within a batch:** catch the same photo re-uploaded by different blogs (about 1 in 10 in the 52-image test) with a perceptual hash of each thumbnail, computed on the server with `sharp`? No AI and no database; it means fetching ~1,400 small thumbnails during the check (a few minutes, light CPU). It catches resized and re-compressed copies, not recolored or cropped ones.
 
 ## Later
 
