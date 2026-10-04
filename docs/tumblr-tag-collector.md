@@ -132,6 +132,7 @@ What a page contains:
 ## Milestones
 
 1. **Server batch, dry run:** data folder, ledger, `POST /batch` that only classifies. Verify against the Marta Bevacqua results.
+   ✅ Done Oct 4, 2026 (homelab-config `efe5278`, branch only). Test on the 52 Marta Bevacqua images plus seeded ledger and file names: 41 new, 3 downloaded before, 9 repeats, 1 invalid — all as predicted. Listing the real Inspiration Board (129k files) takes under a second.
 2. **Extension collector:** tag page → list → server → preview.
 3. **Server download queue:** sequential downloads, ledger, progress.
 4. **First real run** on `marta bevacqua`, watching memory (`docker stats`).
