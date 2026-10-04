@@ -4,7 +4,8 @@
 // internal API, so mature posts are included and results go back years), keeps photos only
 // and merges reblogs by media key. The list goes to the image-downloader server through the
 // background worker; the server marks what was downloaded before and what is a re-upload,
-// and this panel shows that preview. Nothing is downloaded yet at this step.
+// and this panel shows that preview. On Download, the server saves the new images one at a
+// time; that runs on the server, so the panel (or the tab) can be closed meanwhile.
 (() => {
   if (window.__inspoCollector) {
     window.__inspoCollector.show();
@@ -73,9 +74,13 @@
     }));
   }
 
+  let downloadStarted = false;
+
+  // Closing before the download drops the run on the server; once downloading, the server
+  // carries on without the panel.
   function close() {
     stopped = true;
-    if (batchId) server({ type: "inspo-batch-cancel", id: batchId }).catch(() => {});
+    if (batchId && !downloadStarted) server({ type: "inspo-batch-cancel", id: batchId }).catch(() => {});
     host.remove();
     delete window.__inspoCollector;
   }
@@ -234,14 +239,58 @@
       </table>
       <div class="note">From ${fmt(stats.posts)} posts (${fmt(stats.mature)} photos from mature posts). Left out: ${fmt(stats.ads)} ads, ${fmt(stats.gifs)} GIFs, ${fmt(stats.textOnly)} text posts, ${fmt(stats.sameUpload)} reblogs of the same upload.${(batch.warnings || []).length ? " Server: " + escapeHtml(batch.warnings.join(" ")) : ""}</div>`;
     setActions([
-      { label: `Download ${fmt(c.new)}`, kind: "primary", disabled: true, title: "Downloading comes in the next step of the build" },
+      { label: `Download ${fmt(c.new)}`, kind: "primary", disabled: !c.new, onClick: () => download().catch(showError) },
       { label: "Close", onClick: close }
     ]);
   }
 
-  run().catch((err) => {
+  // ---- 4. Download (runs on the server; the panel only follows it) ----
+  async function download() {
+    downloadStarted = true;
+    setActions([]);
+    setStatus("Starting the download…");
+    let batch = await server({ type: "inspo-batch-download", id: batchId });
+
+    while (!stopped && ["download-queued", "downloading"].includes(batch.phase)) {
+      const d = batch.download;
+      setStatus(batch.phase === "download-queued"
+        ? "Waiting for the server (another run is in progress)…"
+        : `Downloading… ${fmt(d.done)} / ${fmt(d.total)}${d.failed ? ` · ${fmt(d.failed)} failed` : ""}`);
+      setActions([
+        { label: "Stop", onClick: () => server({ type: "inspo-batch-cancel", id: batchId }).catch(showError) },
+        { label: "Hide", title: "The download continues on the server", onClick: close }
+      ]);
+      await pause(POLL_MS);
+      batch = await server({ type: "inspo-batch-status", id: batchId });
+    }
+    if (stopped) return;
+    if (batch.phase === "failed") throw new Error(`The server's download failed. ${(batch.warnings || []).join(" ")}`);
+
+    const d = batch.download;
+    const left = d.total - d.done;
+    setStatus(batch.phase === "done"
+      ? `Done. Press the Immich scan button to pick up the new photos.`
+      : `Stopped with ${fmt(left)} still to download.`);
+    $(".result").innerHTML = `
+      <table>
+        <tr class="new"><td>Saved</td><td class="n">${fmt(d.saved)}</td></tr>
+        ${d.alreadySaved ? `<tr><td>Already saved meanwhile</td><td class="n">${fmt(d.alreadySaved)}</td></tr>` : ""}
+        ${d.skipped ? `<tr><td>Skipped (GIFs)</td><td class="n">${fmt(d.skipped)}</td></tr>` : ""}
+        ${d.failed ? `<tr><td>Failed</td><td class="n">${fmt(d.failed)}</td></tr>` : ""}
+        ${left ? `<tr><td>Not downloaded yet</td><td class="n">${fmt(left)}</td></tr>` : ""}
+      </table>`;
+    const again = d.failed + left;
+    setActions([
+      ...(again ? [{ label: left ? `Continue (${fmt(again)})` : `Retry ${fmt(again)} failed`, kind: "primary", onClick: () => download().catch(showError) }] : []),
+      { label: "Close", onClick: close }
+    ]);
+  }
+
+  function showError(err) {
     if (stopped) return;
     setStatus(err.message, true);
     setActions([{ label: "Close", onClick: close }]);
-  });
+  }
+
+  run().catch(showError);
 })();

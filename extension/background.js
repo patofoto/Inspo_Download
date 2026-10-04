@@ -54,6 +54,7 @@ async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey) {
 const BATCH_ROUTES = {
   "inspo-batch-create": (msg) => ["POST", "/batch", { tag: msg.tag, items: msg.items }],
   "inspo-batch-status": (msg) => ["GET", `/batch/${encodeURIComponent(msg.id)}`],
+  "inspo-batch-download": (msg) => ["POST", `/batch/${encodeURIComponent(msg.id)}/download`],
   "inspo-batch-cancel": (msg) => ["POST", `/batch/${encodeURIComponent(msg.id)}/cancel`]
 };
 
