@@ -15,12 +15,12 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         showBadge("!", "#f44336");
         return;
       }
-      downloadImage(info.srcUrl, tab.url, config.serverUrl, config.apiKey);
+      downloadImage(info.srcUrl, tab.url, config.serverUrl, config.apiKey, tab.id);
     });
   }
 });
 
-async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey) {
+async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey, tabId) {
   showBadge("...", "#1a73e8");
 
   try {
@@ -37,9 +37,11 @@ async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey) {
 
     const data = await response.json();
 
-    // Green checkmark for 3 seconds; a grey "=" when the image was already saved before
+    // Green checkmark for 3 seconds; a grey "=" and a note on the page when the image was
+    // already saved before
     if (data.count === 0 && data.alreadySaved) {
       showBadge("=", "#757575");
+      showPageNote(tabId, "Already in the Inspiration Board, not saved again");
     } else {
       showBadge("✓", "#4caf50");
     }
@@ -51,6 +53,35 @@ async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey) {
     showBadge("✗", "#f44336");
     setTimeout(() => showBadge("", "#f44336"), 3000);
   }
+}
+
+// A short note in the bottom-right corner of the page, fading out after a few seconds.
+// Pages the extension can't script (chrome://, the Web Store) just keep the badge.
+function showPageNote(tabId, text) {
+  if (tabId == null || tabId < 0) return;
+  chrome.scripting.executeScript({ target: { tabId }, func: pageNote, args: [text] }).catch(() => {});
+}
+
+// Runs inside the page (shadow DOM, so the page's styles don't apply)
+function pageNote(text) {
+  document.getElementById("inspo-note")?.remove();
+  const host = document.createElement("div");
+  host.id = "inspo-note";
+  host.style.cssText = "position:fixed;right:24px;bottom:24px;z-index:2147483647";
+  const root = host.attachShadow({ mode: "open" });
+  root.innerHTML = `<style>
+    .note { font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #fff; background: #424242;
+            padding: 10px 14px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.35); max-width: 320px;
+            transition: opacity .25s; animation: fade-in .25s ease-out; }
+    @keyframes fade-in { from { opacity: 0; } }
+  </style><div class="note"></div>`;
+  const note = root.querySelector(".note");
+  note.textContent = text;
+  document.documentElement.appendChild(host);
+  setTimeout(() => {
+    note.style.opacity = "0";
+    setTimeout(() => host.remove(), 300);
+  }, 4000);
 }
 
 // Tag runs: the collector (collector.js, running in a Tumblr tab) hands its list to the
