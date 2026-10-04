@@ -64,7 +64,7 @@ What a page contains:
 
 1. **Source:** the tag page's Latest view, collected by the extension inside the logged-in browser.
 2. **Selection:** download everything; culling happens in Immich.
-3. **Duplicates:** avoid downloading the same Tumblr image twice, using cheap checks only (below). **No comparison against Immich's database**: it cost 0.35–0.8 s of database CPU per image on an already busy server. Images already in Immich get deleted from Immich's duplicate review instead.
+3. **Duplicates:** avoid downloading the same Tumblr image twice, and only one copy of a photo re-uploaded by several blogs, using cheap checks only (below). **No comparison against Immich's database**: it cost 0.35–0.8 s of database CPU per image on an already busy server. Images already in Immich get deleted from Immich's duplicate review instead.
 4. **Order:** collect, check, preview, then download only after confirmation. Downloads run one at a time.
 5. **No new tools:** Immich's built-in duplicate review handles what's left. immich-deduper was reviewed and set aside.
 6. **One exact tag per run**, as typed. No merging of spellings like `martabevacqua`.
@@ -75,8 +75,8 @@ What a page contains:
 
 ```text
 1. Collect   (browser)   tag page → all posts → drop ads, GIFs, text → merge by media key
-2. Check     (server)    per image: downloaded before? (ledger, existing file name)
-3. Preview   (extension) "1,422 found · 30 downloaded before · download 1,392?"  [Download] [Cancel]
+2. Check     (server)    per image: downloaded before? (ledger, existing file name) → re-upload of a photo already in this batch? (perceptual hash)
+3. Preview   (extension) "1,422 found · 30 downloaded before · 150 re-uploads · download 1,242?"  [Download] [Cancel]
 4. Download  (server)    one at a time, existing save pipeline; progress
 5. Scan      (you)       press the webhook-trigger button; delete leftovers in Immich's duplicate review
 ```
@@ -88,7 +88,7 @@ What a page contains:
 | Reblogs and repeated posts of the same upload | same media key | extension, while collecting |
 | Downloaded in an earlier run | ledger of saved media keys | server |
 | Saved before the ledger existed (~30k files named after Tumblr's file hash) | largest-size file hash matches an existing file name | server |
-| The same photo re-uploaded by another blog | not caught (Immich's duplicate review) | see open question |
+| The same photo re-uploaded by another blog (same run) | perceptual hash of the thumbnail; keep the highest resolution | server |
 | Already in Immich from other sources | not caught (Immich's duplicate review) | |
 
 ## Extension (Inspo_Download/extension)
@@ -115,6 +115,7 @@ What a page contains:
 
 1. **Ledger:** has this media key been downloaded before? Skip. The ledger is a new file of media keys the server saved.
 2. **Existing file names:** list the Inspiration Board once per batch; skip an image whose largest-size file hash (the last path segment of its URL, which the server uses as the file name) is already there.
+3. **Re-uploads in this batch:** fetch each remaining image's ~540 px thumbnail (one at a time), compute a 256-bit difference hash with `sharp` (greyscale, 17×16, compare neighbours), and compare with the images already kept. At **≤ 20 bits apart** it's the same photo: keep the higher-resolution one, mark the other `repeat`. A thumbnail that fails to load is kept as `new`.
 
 ### Download phase (sequential)
 
@@ -125,7 +126,8 @@ What a page contains:
 ### Config
 
 - Batch state and the ledger live in a host data folder, following the repo convention (`~/image-downloader-m1/` on the Mac mini, mounted at `/data`), so they survive restarts and stay out of the Git checkout.
-- No new dependencies, no access to Immich's network or database.
+- No new dependencies (`sharp` is already used), no access to Immich's network or database.
+- New env var: `REPEAT_MAX_BITS` (default 20).
 
 ## Milestones
 
@@ -141,9 +143,15 @@ What a page contains:
 - **Tag variants:** one exact tag per run, as typed.
 - **Comparison with Immich's database:** dropped. It worked (10 of 10 duplicates found, no false skips below distance 0.035), but cost 0.35–0.8 s of database CPU per image because Immich's vector index is a single cluster. The read-only role `inspo_reader` created for it was removed again the same day.
 
-## Open question
+## Re-upload check calibration (Oct 4, 2026)
 
-- **Re-uploads within a batch:** catch the same photo re-uploaded by different blogs (about 1 in 10 in the 52-image test) with a perceptual hash of each thumbnail, computed on the server with `sharp`? No AI and no database; it means fetching ~1,400 small thumbnails during the check (a few minutes, light CPU). It catches resized and re-compressed copies, not recolored or cropped ones.
+On the 52 Marta Bevacqua images, 256-bit difference hashes of the ~540 px thumbnails:
+
+- The 5 pairs Immich's AI rated near-identical: **0 bits apart** (identical hashes)
+- 5 more pairs, checked by eye as the same photo slightly edited or re-compressed: **3–7 bits**
+- The closest pair of different photos: **77 bits**, then 90 and up
+
+So ≤ 20 bits leaves a wide margin on both sides. 6 photos were uploaded 2–3 times each: 52 images → 44 downloads. A 64-bit hash was too coarse (different photos at 0–1 bits apart). The cutoff is a setting (`REPEAT_MAX_BITS`) in case larger runs need tuning.
 
 ## Later
 
