@@ -2,7 +2,7 @@
 
 Collect every photo posted under a Tumblr tag (a photographer or model), skip what's already in Immich, download the rest into the Inspiration Board, and let culling happen in Immich. One exact tag per run (multi-word names like "marta bevacqua" are a single tag, not case-sensitive); no alternate spellings.
 
-Branch `feature/tumblr-tag-collector` in both repos:
+Built on a `feature/tumblr-tag-collector` branch in both repos, merged into `main` on Oct 4, 2026:
 
 - **Inspo_Download** — the Chrome extension side, plus this plan
 - **homelab-config** (`image-downloader-m1/`) — the server side
