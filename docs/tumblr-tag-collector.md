@@ -1,6 +1,6 @@
 # Tumblr tag collector — plan
 
-Collect every photo posted under a Tumblr tag (a photographer or model), skip what's already in Immich, download the rest into the Inspiration Board, and let culling happen in Immich.
+Collect every photo posted under a Tumblr tag (a photographer or model), skip what's already in Immich, download the rest into the Inspiration Board, and let culling happen in Immich. One exact tag per run (multi-word names like "marta bevacqua" are a single tag, not case-sensitive); no alternate spellings.
 
 Branch `feature/tumblr-tag-collector` in both repos:
 
@@ -67,6 +67,9 @@ What a page contains:
 3. **Duplicates:** check before download using Immich's existing embeddings. Skip only below **0.035**; when unsure, download.
 4. **Order:** check everything first, show a preview, download only after confirmation. One phase at a time, one item at a time, so the ML model is loaded only during the check (minutes), not during the download (up to an hour).
 5. **No new tools:** Immich's built-in duplicate review handles what's left. immich-deduper was reviewed and set aside.
+6. **One exact tag per run**, as typed. No merging of spellings like `martabevacqua`.
+7. **No size filter.** Small unique images are kept; smaller copies of existing images are left to Immich's duplicate review.
+8. **Immich scan is triggered by you** (webhook-trigger button) after a run, not by the server.
 
 ## Flow
 
@@ -75,7 +78,7 @@ What a page contains:
 2. Check     (server)   per image: already downloaded? → in Immich (< 0.035)? → repeat within batch?
 3. Preview   (extension) "1,422 found · 280 already have · 40 repeats · download 1,102?"  [Download] [Cancel]
 4. Download  (server)   one at a time, existing save pipeline; progress
-5. Scan      (server)   call the Immich scan webhook (n8n) once at the end
+5. Scan      (you)      press the webhook-trigger button so Immich picks up the new files
 ```
 
 ## Extension (Inspo_Download/extension)
@@ -110,27 +113,29 @@ What a page contains:
 - Reuse `saveImageFromUrl` (GIF skip, format sniffing, SMB-safe names, async writes)
 - Add each saved media key to the ledger
 - Keep a short optional pause between downloads
-- When finished, call the scan webhook once (env `IMMICH_SCAN_WEBHOOK`)
 
 ### Connectivity and config
 
 - Join the external network `immich-m1_default` (no change to the Immich stack) to reach `immich_machine_learning:3003` and `immich_postgres:5432`.
-- Database access through a **read-only role** with `SELECT` on `asset` and `smart_search` only. Creating it is a one-time change in Immich's database and needs your OK.
+- Database access through a **read-only role** with `SELECT` on `asset` and `smart_search` only (approved). Its password lives in Portainer and 1Password.
 - New dependency: `pg`.
-- New env vars: `IMMICH_ML_URL`, `IMMICH_DB_URL`, `DUPLICATE_MAX_DISTANCE` (0.035), `IMMICH_SCAN_WEBHOOK`.
+- New env vars: `IMMICH_ML_URL`, `IMMICH_DB_URL`, `DUPLICATE_MAX_DISTANCE` (0.035).
 - Batch state and the ledger live in a host data folder, following the repo convention (`~/image-downloader-m1/` on the Mac mini, mounted at `/data`), so they survive restarts and stay out of the Git checkout.
 
 ## Milestones
 
 1. **Server check, dry run:** connectivity, read-only role, `POST /batch` that only classifies. Verify against the Marta Bevacqua results.
 2. **Extension collector:** tag page → list → server → preview.
-3. **Server download queue:** sequential downloads, ledger, progress, scan webhook.
+3. **Server download queue:** sequential downloads, ledger, progress.
 4. **First real run** on `marta bevacqua`, watching memory (`docker stats`) and tuning the threshold if needed.
 
-## Open questions
+## Settled questions (Oct 4, 2026)
 
-- What is the n8n webhook URL that starts the Immich scan? It goes into `IMMICH_SCAN_WEBHOOK`.
-- OK to create the read-only database role in Immich's Postgres?
-- Filter out small images? 8 of 32 sampled were under 1000 px on the long side.
-- Merge tag variants (`martabevacqua`: 46 more posts) in one run, or one tag at a time?
-- Later: the official tag API as a fallback if Tumblr changes its internal API (public posts only).
+- **Immich scan:** triggered manually with the webhook-trigger button; the server doesn't call it.
+- **Read-only database role:** approved.
+- **Small images:** not filtered.
+- **Tag variants:** one exact tag per run, as typed.
+
+## Later
+
+- The official tag API as a fallback if Tumblr changes its internal API (public posts only).
