@@ -165,5 +165,7 @@ So ≤ 20 bits leaves a wide margin on both sides. 6 photos were uploaded 2–3 
 
 ## Later
 
+- Drawings and animation stills end up in runs alongside photos. For now they're found manually with Immich's Smart Search (`drawing`, `illustration`, `anime`, `cartoon`). Options if this moves into the workflow: skip posts by specific tags (`#anime`, `#animation`, `#illustration`, `#drawing`, `#fanart`, `#cartoon`; not `#art`, which real photos use too), and/or classify each thumbnail with Immich's ML service ("a photograph" vs "a drawing / anime still / cartoon"; same model as Smart Search, no database search, ~0.1–0.3 s per image, model held in memory during the check).
+
 
 - The official tag API as a fallback if Tumblr changes its internal API (public posts only).
