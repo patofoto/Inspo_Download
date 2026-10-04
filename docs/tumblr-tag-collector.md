@@ -138,6 +138,7 @@ What a page contains:
    Note: Chrome pauses tabs left in the background, so collecting needs the tab in front (about a minute per 1,000 posts).
    ✅ First real run Oct 4, 2026 after deploying the server part to `main` (homelab-config `efe5278`): `#Carlos Nunez`, 852 photos → 557 new, 20 downloaded before (by file name; the ledger was still empty), 275 repeats across 136 photos (up to 15 copies each). Server check: 2 min 39 s, 0 thumbnail errors, ~100 MB memory. Every repeat pair 8–16 bits apart (34) and a sample of 0-bit pairs checked by eye: all the same photo, some recolored or black-and-white edits. No false matches.
 3. **Server download queue:** sequential downloads, ledger, progress.
+   ✅ Done Oct 4, 2026 (homelab-config `a08203e`, deployed to `main`; extension `6e8b9a5`). Resumable downloads (stop / continue / retry failed), one shared job queue. Tested locally: stop at 9 of 44, server killed mid-download, continued to 44 files with no duplicates. Panel flow tested in a Tumblr tab against a simulated server.
 4. **First real run** on `marta bevacqua`, watching memory (`docker stats`).
 
 ## Settled questions (Oct 4, 2026)
