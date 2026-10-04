@@ -139,7 +139,7 @@ What a page contains:
 - **Immich scan:** triggered manually with the webhook-trigger button; the server doesn't call it.
 - **Small images:** not filtered.
 - **Tag variants:** one exact tag per run, as typed.
-- **Comparison with Immich's database:** dropped. It worked (10 of 10 duplicates found, no false skips below distance 0.035), but cost 0.35–0.8 s of database CPU per image because Immich's vector index is a single cluster. The read-only role `inspo_reader` created for it is no longer needed.
+- **Comparison with Immich's database:** dropped. It worked (10 of 10 duplicates found, no false skips below distance 0.035), but cost 0.35–0.8 s of database CPU per image because Immich's vector index is a single cluster. The read-only role `inspo_reader` created for it was removed again the same day.
 
 ## Open question
 
