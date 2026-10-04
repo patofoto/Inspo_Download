@@ -58,7 +58,7 @@ What a page contains:
 
 - The Docker VM has 5.9 GiB. Snapshot: immich_server 1.0 GB, postgres 577 MB, machine learning 171 MB idle, image-downloader 193 MB.
 - The ML service loads the model on demand and unloads it after 5 idle minutes.
-- Writes to the Inspiration Board take a few seconds each (exFAT/USB, ~129k files). The server already writes asynchronously and one file at a time.
+- Writes to the Inspiration Board take a few seconds each (exFAT/USB, ~129k files). The server already writes asynchronously and one file at a time. (Measured on the first real run: about 0.3 s per downloaded image in total, so this no longer holds.)
 
 ## Decisions
 
@@ -139,7 +139,8 @@ What a page contains:
    ✅ First real run Oct 4, 2026 after deploying the server part to `main` (homelab-config `efe5278`): `#Carlos Nunez`, 852 photos → 557 new, 20 downloaded before (by file name; the ledger was still empty), 275 repeats across 136 photos (up to 15 copies each). Server check: 2 min 39 s, 0 thumbnail errors, ~100 MB memory. Every repeat pair 8–16 bits apart (34) and a sample of 0-bit pairs checked by eye: all the same photo, some recolored or black-and-white edits. No false matches.
 3. **Server download queue:** sequential downloads, ledger, progress.
    ✅ Done Oct 4, 2026 (homelab-config `a08203e`, deployed to `main`; extension `6e8b9a5`). Resumable downloads (stop / continue / retry failed), one shared job queue. Tested locally: stop at 9 of 44, server killed mid-download, continued to 44 files with no duplicates. Panel flow tested in a Tumblr tab against a simulated server.
-4. **First real run** on `marta bevacqua`, watching memory (`docker stats`).
+4. **First real run**, watching memory (`docker stats`).
+   ✅ Done Oct 4, 2026: `#Carlos Nunez`, 852 photos → 557 new downloaded, 0 failed, all files present (66 MB). Download took 3 min 42 s (~0.3 s per image, far faster than the few seconds per write expected). Server memory ~90–100 MB throughout. The run created no duplicate files.
 
 ## Settled questions (Oct 4, 2026)
 
@@ -159,5 +160,7 @@ On the 52 Marta Bevacqua images, 256-bit difference hashes of the ~540 px thumbn
 So ≤ 20 bits leaves a wide margin on both sides. 6 photos were uploaded 2–3 times each: 52 images → 44 downloads. A 64-bit hash was too coarse (different photos at 0–1 bits apart). The cutoff is a setting (`REPEAT_MAX_BITS`) in case larger runs need tuning.
 
 ## Later
+
+- Single saves (right-click, phone) don't check whether the image is already on the drive; on Oct 4, 12 images saved that morning duplicated files from March. They could use the same ledger and file-name check as tag runs.
 
 - The official tag API as a fallback if Tumblr changes its internal API (public posts only).
