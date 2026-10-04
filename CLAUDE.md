@@ -27,7 +27,7 @@ The server is **not** in this repo. It is `image-downloader-m1/` in the `patofot
 Right-click image → extension/background.js
   → reads serverUrl + apiKey from chrome.storage.local (set on the options page)
   → POST {serverUrl}/upload { imageUrl, sourceUrl, apiKey }
-  → badge "..." (sending), "✓" (saved), "✗" (error)
+  → badge "..." (sending), "✓" (saved), "=" (Tumblr image already saved, not saved again), "✗" (error)
 ```
 
 The server fetches the image itself, which avoids CORS issues in the browser.
