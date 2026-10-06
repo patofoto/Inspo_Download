@@ -52,6 +52,8 @@ Toolbar popup on tumblr.com/tagged/<tag> → injects extension/collector.js into
 
 **Load an extension:** `chrome://extensions/` → Developer mode → Load unpacked → `extension/` or `webhook-trigger/`. After editing `background.js` or `options.js`, click the reload icon there.
 
+**Versioning:** bump `version` in `extension/manifest.json` with every change to the extension, so the number shown in `chrome://extensions` tells the user which build is loaded (1.2 = tag collector with download, already-saved note with Copy name / Save again, top-right note closing with Esc).
+
 **Test the server:**
 
 ```bash
