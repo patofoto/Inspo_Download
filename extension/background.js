@@ -20,14 +20,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
-async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey, tabId) {
+// force: save even if the server says it's already saved (the note's "Save again")
+async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey, tabId, force = false) {
   showBadge("...", "#1a73e8");
 
   try {
     const response = await fetch(`${serverUrl}/upload`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl, sourceUrl: pageUrl, apiKey })
+      body: JSON.stringify({ imageUrl, sourceUrl: pageUrl, apiKey, ...(force ? { force: true } : {}) })
     });
 
     if (!response.ok) {
@@ -41,9 +42,21 @@ async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey, tabId) {
     // already saved before
     if (data.count === 0 && data.alreadySaved) {
       showBadge("=", "#757575");
-      showPageNote(tabId, "Already in the Inspiration Board, not saved again");
+      const filename = data.alreadySavedFiles?.[0];
+      showPageNote(tabId, filename
+        ? {
+            text: "Already in the Inspiration Board",
+            detail: filename,
+            copyText: searchName(filename),
+            again: { imageUrl, pageUrl }
+          }
+        : {
+            text: "Downloaded before, but no longer in the Inspiration Board",
+            again: { imageUrl, pageUrl }
+          });
     } else {
       showBadge("✓", "#4caf50");
+      if (force) showPageNote(tabId, { text: "Saved again", detail: data.filename });
     }
     setTimeout(() => showBadge("", "#4caf50"), 3000);
 
@@ -55,15 +68,22 @@ async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey, tabId) {
   }
 }
 
-// A short note in the bottom-right corner of the page, fading out after a few seconds.
-// Pages the extension can't script (chrome://, the Web Store) just keep the badge.
-function showPageNote(tabId, text) {
-  if (tabId == null || tabId < 0) return;
-  chrome.scripting.executeScript({ target: { tabId }, func: pageNote, args: [text] }).catch(() => {});
+// The part of a saved file's name that all its copies share (the server adds
+// _<date>T<time> and an extension), so an Immich file-name search finds every copy.
+function searchName(filename) {
+  return filename.replace(/\.[^.]+$/, "").replace(/_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(_\d{2})?$/, "");
 }
 
-// Runs inside the page (shadow DOM, so the page's styles don't apply)
-function pageNote(text) {
+// A note in the bottom-right corner of the page. Pages the extension can't script
+// (chrome://, the Web Store) just keep the badge.
+function showPageNote(tabId, options) {
+  if (tabId == null || tabId < 0) return;
+  chrome.scripting.executeScript({ target: { tabId }, func: pageNote, args: [options] }).catch(() => {});
+}
+
+// Runs inside the page (shadow DOM, so the page's styles don't apply). With buttons it
+// stays longer and doesn't fade while the pointer is on it.
+function pageNote({ text, detail, copyText, again }) {
   document.getElementById("inspo-note")?.remove();
   const host = document.createElement("div");
   host.id = "inspo-note";
@@ -71,17 +91,70 @@ function pageNote(text) {
   const root = host.attachShadow({ mode: "open" });
   root.innerHTML = `<style>
     .note { font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #fff; background: #424242;
-            padding: 10px 14px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.35); max-width: 320px;
+            padding: 10px 14px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.35); max-width: 340px;
             transition: opacity .25s; animation: fade-in .25s ease-out; }
     @keyframes fade-in { from { opacity: 0; } }
-  </style><div class="note"></div>`;
+    .head { display: flex; gap: 10px; align-items: flex-start; }
+    .text { flex: 1; }
+    .x { border: 0; background: none; color: #bbb; font-size: 16px; line-height: 1; cursor: pointer; padding: 0; }
+    .detail { color: #ccc; font-size: 12px; margin-top: 2px; word-break: break-all; }
+    .buttons { display: flex; gap: 8px; margin-top: 8px; }
+    .buttons button { border: 0; border-radius: 5px; padding: 5px 10px; font: inherit; font-size: 12px; cursor: pointer;
+                      background: #616161; color: #fff; }
+    .buttons button:hover { background: #757575; }
+  </style>
+  <div class="note"><div class="head"><div class="text"></div><button class="x" title="Close">×</button></div></div>`;
   const note = root.querySelector(".note");
-  note.textContent = text;
+  root.querySelector(".text").textContent = text;
+  if (detail) {
+    const d = document.createElement("div");
+    d.className = "detail";
+    d.textContent = detail;
+    note.appendChild(d);
+  }
+
+  const buttons = document.createElement("div");
+  buttons.className = "buttons";
+  if (copyText) {
+    const copy = document.createElement("button");
+    copy.textContent = "Copy name for Immich search";
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(copyText);
+      } catch {
+        const area = document.createElement("textarea");
+        area.value = copyText;
+        root.appendChild(area);
+        area.select();
+        document.execCommand("copy");
+        area.remove();
+      }
+      copy.textContent = "Copied";
+    });
+    buttons.appendChild(copy);
+  }
+  if (again) {
+    const save = document.createElement("button");
+    save.textContent = "Save again";
+    save.title = "Save a second copy anyway";
+    save.addEventListener("click", () => {
+      save.textContent = "Saving…";
+      save.disabled = true;
+      chrome.runtime.sendMessage({ type: "inspo-save-again", ...again });
+    });
+    buttons.appendChild(save);
+  }
+  if (buttons.children.length) note.appendChild(buttons);
   document.documentElement.appendChild(host);
-  setTimeout(() => {
+
+  const remove = () => {
     note.style.opacity = "0";
     setTimeout(() => host.remove(), 300);
-  }, 4000);
+  };
+  root.querySelector(".x").addEventListener("click", remove);
+  let timer = setTimeout(remove, buttons.children.length ? 12000 : 4000);
+  note.addEventListener("mouseenter", () => clearTimeout(timer));
+  note.addEventListener("mouseleave", () => (timer = setTimeout(remove, 4000)));
 }
 
 // Tag runs: the collector (collector.js, running in a Tumblr tab) hands its list to the
@@ -93,7 +166,17 @@ const BATCH_ROUTES = {
   "inspo-batch-cancel": (msg) => ["POST", `/batch/${encodeURIComponent(msg.id)}/cancel`]
 };
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // "Save again" on the already-saved note
+  if (msg?.type === "inspo-save-again") {
+    chrome.storage.local.get(["serverUrl", "apiKey"], (config) => {
+      if (config.serverUrl && config.apiKey) {
+        downloadImage(msg.imageUrl, msg.pageUrl, config.serverUrl, config.apiKey, sender.tab?.id, true);
+      }
+    });
+    return false;
+  }
+
   const route = BATCH_ROUTES[msg?.type];
   if (!route) return false;
   batchRequest(...route(msg)).then(

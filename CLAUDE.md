@@ -30,6 +30,8 @@ Right-click image → extension/background.js
   → badge "..." (sending), "✓" (saved), "=" (Tumblr image already saved, not saved again), "✗" (error)
 ```
 
+When the server reports "already saved", `background.js` injects a note into the page (`pageNote`) with the existing file name, **Copy name for Immich search** and **Save again**; the latter sends `inspo-save-again` back to `background.js`, which re-posts with `force: true`.
+
 The server fetches the image itself, which avoids CORS issues in the browser.
 
 ## Flow (Tumblr tag collector)
