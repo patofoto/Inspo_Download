@@ -74,20 +74,24 @@ function searchName(filename) {
   return filename.replace(/\.[^.]+$/, "").replace(/_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(_\d{2})?$/, "");
 }
 
-// A note in the bottom-right corner of the page. Pages the extension can't script
-// (chrome://, the Web Store) just keep the badge.
+// A note in the top-right corner of the page, near where the pointer usually is after the
+// right-click menu. Pages the extension can't script (chrome://, the Web Store) just keep
+// the badge.
 function showPageNote(tabId, options) {
   if (tabId == null || tabId < 0) return;
   chrome.scripting.executeScript({ target: { tabId }, func: pageNote, args: [options] }).catch(() => {});
 }
 
 // Runs inside the page (shadow DOM, so the page's styles don't apply). With buttons it
-// stays longer and doesn't fade while the pointer is on it.
+// stays longer and doesn't fade while the pointer is on it. Esc closes it.
 function pageNote({ text, detail, copyText, again }) {
+  // Replace a note still showing, including its Esc listener (injected scripts share one
+  // isolated world per page, so the previous note's close function is still reachable)
+  window.__inspoCloseNote?.(true);
   document.getElementById("inspo-note")?.remove();
   const host = document.createElement("div");
   host.id = "inspo-note";
-  host.style.cssText = "position:fixed;right:24px;bottom:24px;z-index:2147483647";
+  host.style.cssText = "position:fixed;right:24px;top:24px;z-index:2147483647";
   const root = host.attachShadow({ mode: "open" });
   root.innerHTML = `<style>
     .note { font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #fff; background: #424242;
@@ -147,10 +151,22 @@ function pageNote({ text, detail, copyText, again }) {
   if (buttons.children.length) note.appendChild(buttons);
   document.documentElement.appendChild(host);
 
-  const remove = () => {
+  // While the note is up, Esc closes it and nothing else (the page doesn't also get it)
+  const onKey = (e) => {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    remove();
+  };
+  const remove = (immediately) => {
+    window.removeEventListener("keydown", onKey, true);
+    if (window.__inspoCloseNote === remove) delete window.__inspoCloseNote;
+    if (immediately === true) return host.remove();
     note.style.opacity = "0";
     setTimeout(() => host.remove(), 300);
   };
+  window.__inspoCloseNote = remove;
+  window.addEventListener("keydown", onKey, true);
   root.querySelector(".x").addEventListener("click", remove);
   let timer = setTimeout(remove, buttons.children.length ? 12000 : 4000);
   note.addEventListener("mouseenter", () => clearTimeout(timer));

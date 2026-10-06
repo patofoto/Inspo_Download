@@ -29,7 +29,7 @@ On the iPhone, the **Inspo Board** Shortcut in the share sheet does the same job
 4. **Download** saves the new ones on the server, one at a time. The panel shows progress; **Stop** pauses (continue later), **Hide** closes the panel while the server carries on.
 5. Press the webhook-trigger button so Immich picks up the new photos, then cull in Immich's duplicate review.
 
-Single right-click saves skip a Tumblr image that's already saved: the badge shows a grey `=` instead of `✓`, and a note in the corner of the page says so, with the existing file's name. **Copy name for Immich search** copies the part of the name all copies share, for Immich's file-name search. **Save again** saves a second copy anyway, for example to pair it with the existing one in Immich's duplicate review. If the image was deleted since, the note says *Downloaded before, but no longer in the Inspiration Board*.
+Single right-click saves skip a Tumblr image that's already saved: the badge shows a grey `=` instead of `✓`, and a note in the top-right corner of the page says so, with the existing file's name (Esc or × closes it). **Copy name for Immich search** copies the part of the name all copies share, for Immich's file-name search. **Save again** saves a second copy anyway, for example to pair it with the existing one in Immich's duplicate review. If the image was deleted since, the note says *Downloaded before, but no longer in the Inspiration Board*.
 
 Plan and findings: [`docs/tumblr-tag-collector.md`](docs/tumblr-tag-collector.md).
 
