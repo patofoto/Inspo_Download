@@ -29,7 +29,7 @@ On the iPhone, the **Inspo Board** Shortcut in the share sheet does the same job
 4. **Download** saves the new ones on the server, one at a time. The panel shows progress; **Stop** pauses (continue later), **Hide** closes the panel while the server carries on.
 5. Press the webhook-trigger button so Immich picks up the new photos, then cull in Immich's duplicate review.
 
-Single right-click saves skip a Tumblr image that's already saved: the badge shows a grey `=` instead of `✓`, and a note in the top-right corner of the page says so, with the existing file's name (Esc or × closes it). **Copy name for Immich search** copies the part of the name all copies share, for Immich's file-name search. **Save again** saves a second copy anyway, for example to pair it with the existing one in Immich's duplicate review. If the image was deleted since, the note says *Downloaded before, but no longer in the Inspiration Board*.
+Single right-click saves always save, even an image saved before; duplicates are deleted in Immich's duplicate review.
 
 Plan and findings: [`docs/tumblr-tag-collector.md`](docs/tumblr-tag-collector.md).
 
@@ -46,7 +46,7 @@ Paste `scriptable/InspoDownload.js` into Scriptable and set `API_KEY` at the top
 `POST /upload` with JSON `{ "imageUrl": "...", "sourceUrl": "...", "apiKey": "..." }` (or the key in an `X-API-Key` header).
 
 - `imageUrl` can be a direct image link or a Tumblr post link. For Tumblr posts the server finds the photos itself, including every photo of a multi-photo post and posts on login-only blogs. GIFs are skipped.
-- `200` → `{ "success": true, "count": 1, "filename": "...", "filenames": [...] }`, or `{ "success": true, "count": 0, "alreadySaved": 1, "message": "..." }` when the Tumblr image was already saved
+- `200` → `{ "success": true, "count": 1, "filename": "...", "filenames": [...] }`
 - `401` → wrong API key
 - `422` → `{ "error": "...", "message": "..." }` when nothing could be saved
 

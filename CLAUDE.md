@@ -27,10 +27,10 @@ The server is **not** in this repo. It is `image-downloader-m1/` in the `patofot
 Right-click image → extension/background.js
   → reads serverUrl + apiKey from chrome.storage.local (set on the options page)
   → POST {serverUrl}/upload { imageUrl, sourceUrl, apiKey }
-  → badge "..." (sending), "✓" (saved), "=" (Tumblr image already saved, not saved again), "✗" (error)
+  → badge "..." (sending), "✓" (saved), "✗" (error)
 ```
 
-When the server reports "already saved", `background.js` injects a note into the page (`pageNote`) with the existing file name, **Copy name for Immich search** and **Save again**; the latter sends `inspo-save-again` back to `background.js`, which re-posts with `force: true`.
+Single saves always save, even an image saved before (the user deletes duplicates in Immich); the server still records each saved image's media key, so tag runs skip it.
 
 The server fetches the image itself, which avoids CORS issues in the browser.
 
@@ -52,7 +52,7 @@ Toolbar popup on tumblr.com/tagged/<tag> → injects extension/collector.js into
 
 **Load an extension:** `chrome://extensions/` → Developer mode → Load unpacked → `extension/` or `webhook-trigger/`. After editing `background.js` or `options.js`, click the reload icon there.
 
-**Versioning:** bump `version` in `extension/manifest.json` with every change to the extension, so the number shown in `chrome://extensions` tells the user which build is loaded (1.2 = tag collector with download, already-saved note with Copy name / Save again, top-right note closing with Esc).
+**Versioning:** bump `version` in `extension/manifest.json` with every change to the extension, so the number shown in `chrome://extensions` tells the user which build is loaded (1.2 = tag collector with download and an already-saved note; 1.3 = single saves always save again, the already-saved check and note removed).
 
 **Test the server:**
 

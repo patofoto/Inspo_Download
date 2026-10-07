@@ -161,6 +161,8 @@ So ≤ 20 bits leaves a wide margin on both sides. 6 photos were uploaded 2–3 
 
 ## Also done (Oct 4, 2026)
 
+- Oct 7, 2026: the single-save check below was removed again at the user's request. Single saves always save; duplicates are deleted in Immich. Tag runs keep their downloaded-before check, so reruns don't fetch everything again.
+
 - Single saves (right-click, phone) now skip a Tumblr image that's already saved, using the same ledger and file-name check (homelab-config `338bd69`). That morning, 12 single saves had duplicated files from March.
 
 ## Later
