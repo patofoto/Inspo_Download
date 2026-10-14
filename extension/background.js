@@ -1,20 +1,17 @@
 // Create context menu for images
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
+    // One item: on Tumblr it saves the whole post the image belongs to (like the phone's
+    // share), elsewhere just the image
     chrome.contextMenus.create({
       id: "download-image",
       title: "Download to Network Drive",
       contexts: ["image"]
     });
-    // Tumblr only: every photo in the post the image belongs to (like the phone's share)
-    chrome.contextMenus.create({
-      id: "download-post",
-      title: "Download whole post to Network Drive",
-      contexts: ["image"],
-      documentUrlPatterns: ["https://www.tumblr.com/*", "https://*.tumblr.com/*"]
-    });
   });
 });
+
+const TUMBLR_PAGE = /^https:\/\/(?:[A-Za-z0-9-]+\.)?tumblr\.com\//;
 
 // A Tumblr post link: www.tumblr.com/<blog>/<id>, www.tumblr.com/blog/view/<blog>/<id> or
 // <blog>.tumblr.com/post/<id>
@@ -22,18 +19,18 @@ const POST_LINK = /^https:\/\/(?:www\.tumblr\.com\/(?:blog\/view\/)?[A-Za-z0-9-]
 
 // Handle context menu click
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId !== "download-image" && info.menuItemId !== "download-post") return;
+  if (info.menuItemId !== "download-image") return;
   chrome.storage.local.get(["serverUrl", "apiKey"], async (config) => {
     if (!config.serverUrl || !config.apiKey) {
       showBadge("!", "#f44336");
       return;
     }
-    if (info.menuItemId === "download-image") {
+    if (!TUMBLR_PAGE.test(tab.url || "")) {
       downloadImage(info.srcUrl, tab.url, config.serverUrl, config.apiKey);
       return;
     }
-    // Whole post: the post links around the clicked image (plus the page itself on a post's
-    // own page). The server uses the first of them that really contains the image.
+    // Tumblr: the post links around the clicked image (plus the page itself on a post's own
+    // page). The server saves every photo of the first of them that really contains the image.
     let postUrls = [];
     try {
       const [{ result }] = await chrome.scripting.executeScript({
@@ -91,11 +88,11 @@ async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey, postUrls) {
 
     const data = await response.json();
 
-    // Green checkmark for 3 seconds; for a whole post, the number of images saved instead,
-    // in orange when the post couldn't be found and only the clicked image was saved
+    // For 3 seconds: a green checkmark for one image, the number saved for a post with several,
+    // in orange when the Tumblr post couldn't be found and only the clicked image was saved
     if (postUrls && data.post === null) {
       showBadge(String(data.count || 1), "#fb8c00");
-    } else if (postUrls) {
+    } else if (data.count > 1) {
       showBadge(String(data.count), "#4caf50");
     } else {
       showBadge("✓", "#4caf50");
