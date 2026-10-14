@@ -1,33 +1,87 @@
 // Create context menu for images
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: "download-image",
-    title: "Download to Network Drive",
-    contexts: ["image"]
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "download-image",
+      title: "Download to Network Drive",
+      contexts: ["image"]
+    });
+    // Tumblr only: every photo in the post the image belongs to (like the phone's share)
+    chrome.contextMenus.create({
+      id: "download-post",
+      title: "Download whole post to Network Drive",
+      contexts: ["image"],
+      documentUrlPatterns: ["https://www.tumblr.com/*", "https://*.tumblr.com/*"]
+    });
   });
 });
 
+// A Tumblr post link: www.tumblr.com/<blog>/<id>, www.tumblr.com/blog/view/<blog>/<id> or
+// <blog>.tumblr.com/post/<id>
+const POST_LINK = /^https:\/\/(?:www\.tumblr\.com\/(?:blog\/view\/)?[A-Za-z0-9-]+\/\d{6,}|[A-Za-z0-9-]+\.tumblr\.com\/post\/\d{6,})/;
+
 // Handle context menu click
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "download-image") {
-    chrome.storage.local.get(["serverUrl", "apiKey"], (config) => {
-      if (!config.serverUrl || !config.apiKey) {
-        showBadge("!", "#f44336");
-        return;
-      }
+  if (info.menuItemId !== "download-image" && info.menuItemId !== "download-post") return;
+  chrome.storage.local.get(["serverUrl", "apiKey"], async (config) => {
+    if (!config.serverUrl || !config.apiKey) {
+      showBadge("!", "#f44336");
+      return;
+    }
+    if (info.menuItemId === "download-image") {
       downloadImage(info.srcUrl, tab.url, config.serverUrl, config.apiKey);
-    });
-  }
+      return;
+    }
+    // Whole post: the post links around the clicked image (plus the page itself on a post's
+    // own page). The server uses the first of them that really contains the image.
+    let postUrls = [];
+    try {
+      const [{ result }] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id, frameIds: [info.frameId] },
+        func: findPostLinks,
+        args: [info.srcUrl]
+      });
+      postUrls = result || [];
+    } catch (err) {
+      console.warn("Couldn't look for the post on the page:", err.message);
+    }
+    const page = (tab.url || "").split(/[?#]/)[0];
+    if (POST_LINK.test(page) && !postUrls.includes(page)) postUrls.push(page);
+    downloadImage(info.srcUrl, tab.url, config.serverUrl, config.apiKey, postUrls);
+  });
 });
 
-async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey) {
+// Runs in the Tumblr page: the post links in the post that holds the right-clicked image.
+// tumblr-context.js recorded which element was right-clicked; failing that, the image is
+// found by its address.
+function findPostLinks(srcUrl) {
+  const postLink = /^https:\/\/(?:www\.tumblr\.com\/(?:blog\/view\/)?[A-Za-z0-9-]+\/\d{6,}|[A-Za-z0-9-]+\.tumblr\.com\/post\/\d{6,})/;
+  const key = (srcUrl.match(/media\.tumblr\.com\/([0-9a-f]{32})\//i) || [])[1];
+  let el = window.__inspoContextTarget;
+  if (!(el instanceof Element) || !el.isConnected) {
+    el = [...document.images].find((img) => img.currentSrc === srcUrl || img.src === srcUrl ||
+      (key && (img.currentSrc || img.src || "").includes(key))) || null;
+  }
+  if (!el) return [];
+  const linksIn = (node) => [...node.querySelectorAll("a[href]")].map((a) => a.href.split(/[?#]/)[0]).filter((h) => postLink.test(h));
+  // Posts are <article>s; otherwise the nearest enclosing element that has post links
+  let links = [];
+  const post = el.closest("article");
+  if (post) links = linksIn(post);
+  for (let node = el.parentElement, depth = 0; !links.length && node && depth < 15; node = node.parentElement, depth++) {
+    links = linksIn(node);
+  }
+  return [...new Set(links)].slice(0, 10);
+}
+
+async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey, postUrls) {
   showBadge("...", "#1a73e8");
 
   try {
     const response = await fetch(`${serverUrl}/upload`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl, sourceUrl: pageUrl, apiKey })
+      body: JSON.stringify({ imageUrl, sourceUrl: pageUrl, apiKey, ...(postUrls ? { postUrls } : {}) })
     });
 
     if (!response.ok) {
@@ -35,10 +89,17 @@ async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey) {
       throw new Error(err.error || response.statusText);
     }
 
-    await response.json();
+    const data = await response.json();
 
-    // Show green checkmark for 3 seconds
-    showBadge("✓", "#4caf50");
+    // Green checkmark for 3 seconds; for a whole post, the number of images saved instead,
+    // in orange when the post couldn't be found and only the clicked image was saved
+    if (postUrls && data.post === null) {
+      showBadge(String(data.count || 1), "#fb8c00");
+    } else if (postUrls) {
+      showBadge(String(data.count), "#4caf50");
+    } else {
+      showBadge("✓", "#4caf50");
+    }
     setTimeout(() => showBadge("", "#4caf50"), 3000);
 
   } catch (error) {

@@ -8,7 +8,7 @@ The server is not in this repo. It lives in [`homelab-config/image-downloader-m1
 
 | Folder | What it is |
 | --- | --- |
-| `extension/` | Chrome extension: right-click an image → **Download to Network Drive**; and from the toolbar button, collect a whole Tumblr tag |
+| `extension/` | Chrome extension: right-click an image → **Download to Network Drive**, or on Tumblr **Download whole post to Network Drive**; and from the toolbar button, collect a whole Tumblr tag |
 | `scriptable/` | iOS Scriptable script: share a link → send it to the server |
 | `webhook-trigger/` | Chrome extension: a toolbar button that calls an n8n webhook, which starts an Immich external library scan so newly saved images show up |
 
@@ -20,6 +20,10 @@ On the iPhone, the **Inspo Board** Shortcut in the share sheet does the same job
 
 1. Open `chrome://extensions/`, turn on **Developer mode**, click **Load unpacked**, pick `extension/`.
 2. Open the extension's **Options**: Server URL `https://inspo-dl.make3.co`, API key = the server's `API_KEY`.
+
+### Downloading a whole Tumblr post
+
+Right-click any image of a Tumblr post → **Download whole post to Network Drive** saves every photo in that post, like sharing the post from the phone. It works on the dashboard, tag and search pages and on a post's own page. The badge shows how many images were saved; in orange when the post couldn't be found, in which case only the clicked image was saved. (Tabs opened before the extension was loaded or reloaded may need a refresh first.)
 
 ### Collecting a Tumblr tag
 

@@ -30,6 +30,8 @@ Right-click image → extension/background.js
   → badge "..." (sending), "✓" (saved), "✗" (error)
 ```
 
+**Download whole post** (Tumblr pages only): `tumblr-context.js` (content script) records the right-clicked element; `findPostLinks` collects the post links in its `<article>` (or the nearest element with post links), plus the page itself if it's a permalink, and sends them as `postUrls` with the image. The server saves the photos of the first candidate post that really contains the image, else just the image; the reply's `post` is the matched link or `null`. Badge: count of images saved, orange if `post` is `null`.
+
 Single saves always save, even an image saved before (the user deletes duplicates in Immich); the server still records each saved image's media key, so tag runs skip it.
 
 The server fetches the image itself, which avoids CORS issues in the browser.
@@ -52,7 +54,7 @@ Toolbar popup on tumblr.com/tagged/<tag> → injects extension/collector.js into
 
 **Load an extension:** `chrome://extensions/` → Developer mode → Load unpacked → `extension/` or `webhook-trigger/`. After editing `background.js` or `options.js`, click the reload icon there.
 
-**Versioning:** bump `version` in `extension/manifest.json` with every change to the extension, so the number shown in `chrome://extensions` tells the user which build is loaded (1.2 = tag collector with download and an already-saved note; 1.3 = single saves always save again, the already-saved check and note removed).
+**Versioning:** bump `version` in `extension/manifest.json` with every change to the extension, so the number shown in `chrome://extensions` tells the user which build is loaded (1.2 = tag collector with download and an already-saved note; 1.3 = single saves always save again, the already-saved check and note removed; 1.4 = Download whole post).
 
 **Test the server:**
 
