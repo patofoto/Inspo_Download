@@ -26,7 +26,11 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       return;
     }
     if (!TUMBLR_PAGE.test(tab.url || "")) {
-      downloadImage(info.srcUrl, tab.url, config.serverUrl, config.apiKey);
+      // Elsewhere: Chrome already has the image, so it sends the bytes - some sites (e.g.
+      // behind Cloudflare's bot check) won't let the server fetch it. If Chrome can't read it,
+      // the server tries the address itself.
+      const bytes = await imageFromPage(tab.id, info.frameId, info.srcUrl);
+      downloadImage(info.srcUrl, tab.url, config.serverUrl, config.apiKey, undefined, bytes);
       return;
     }
     // Tumblr: the post links around the clicked image (plus the page itself on a post's own
@@ -71,15 +75,71 @@ function findPostLinks(srcUrl) {
   return [...new Set(links)].slice(0, 10);
 }
 
-async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey, postUrls) {
+// The right-clicked image's bytes as a Blob, read the way the page loads it (with its
+// cookies), else by the extension itself (it may read any site, so an image from another
+// site isn't blocked). null when neither gets an image.
+async function imageFromPage(tabId, frameId, srcUrl) {
+  try {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [frameId] },
+      func: readImage,
+      args: [srcUrl]
+    });
+    if (result) return await (await fetch(result)).blob();   // a data: URL
+  } catch (err) {
+    console.warn("Couldn't read the image in the page:", err.message);
+  }
+  try {
+    const response = await fetch(srcUrl, { credentials: "include" });
+    const blob = response.ok ? await response.blob() : null;
+    if (blob && blob.size && blob.type.startsWith("image/")) return blob;
+  } catch (err) {
+    console.warn("Couldn't read the image:", err.message);
+  }
+  return null;
+}
+
+// Runs in the page: the image as a data: URL, or null (not an image, too big, or blocked).
+async function readImage(srcUrl) {
+  try {
+    const response = await fetch(srcUrl, { credentials: "include" });
+    const blob = response.ok ? await response.blob() : null;
+    if (!blob || !blob.size || blob.size > 50e6 || !blob.type.startsWith("image/")) return null;
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+// bytes: the image itself (sites other than Tumblr), sent to /upload-bytes; otherwise, or
+// with a server from before /upload-bytes, the server fetches imageUrl.
+async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey, postUrls, bytes) {
   showBadge("...", "#1a73e8");
 
   try {
-    const response = await fetch(`${serverUrl}/upload`, {
+    let response = bytes && await fetch(`${serverUrl}/upload-bytes`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl, sourceUrl: pageUrl, apiKey, ...(postUrls ? { postUrls } : {}) })
+      headers: {
+        "X-API-Key": apiKey,
+        "Content-Type": bytes.type || "application/octet-stream",
+        // names the file; a data: or blob: address says nothing, and would be too long
+        "X-Image-Url": encodeURIComponent(/^https?:/.test(imageUrl) ? imageUrl.slice(0, 2000) : ""),
+        "X-Source-Url": encodeURIComponent((pageUrl || "").slice(0, 2000))
+      },
+      body: bytes
     });
+    if (!response || response.status === 404) {
+      response = await fetch(`${serverUrl}/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl, sourceUrl: pageUrl, apiKey, ...(postUrls ? { postUrls } : {}) })
+      });
+    }
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({ error: response.statusText }));
