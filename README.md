@@ -8,7 +8,7 @@ The server is not in this repo. It lives in [`homelab-config/image-downloader-m1
 
 | Folder | What it is |
 | --- | --- |
-| `extension/` | Chrome extension: right-click an image → **Download to Network Drive** (on Tumblr: the whole post); and from the toolbar button, collect a whole Tumblr tag |
+| `extension/` | Chrome extension: right-click an image → **Download to Network Drive** (on Tumblr: the whole post); and from the toolbar button, collect a whole Tumblr tag, YouPic portfolio or page |
 | `scriptable/` | iOS Scriptable script: share a link → send it to the server |
 | `webhook-trigger/` | Chrome extension: a toolbar button that calls an n8n webhook, which starts an Immich external library scan so newly saved images show up |
 
@@ -34,9 +34,18 @@ On other sites the extension sends the image as Chrome already has it, so sites 
 1. Click the extension's toolbar button. On a Tumblr tag page (`tumblr.com/tagged/…`) choose **Collect this tag**; anywhere else, type a name (e.g. *Marta Bevacqua*) and open its tag page first. The tag is used exactly as typed; spaces are part of it.
 2. Keep the tab in front while it collects (about a minute per 1,000 posts). It reads the tag's Latest view with your login, so mature posts are included, and leaves out ads, GIFs, text posts and reblogs of the same upload.
 3. The server checks the list and the panel shows a preview: photos found, downloaded before, re-uploads (the same photo posted by several blogs; the biggest copy is kept), new to download. Nothing has been downloaded yet.
-4. **Download** saves the new ones on the server, one at a time. The panel shows progress; **Stop** pauses (continue later), **Hide** closes the panel while the server carries on.
+4. **Download** saves the new ones on the server, one at a time. The panel shows progress; **Stop** pauses (continue later), **Hide** closes the panel while the server carries on. The album box (pre-filled with the tag) puts the photos into that Immich album once Immich has scanned them, only if an album by that name exists already.
 5. Press the webhook-trigger button so Immich picks up the new photos, then cull in Immich's duplicate review.
 6. Give the new photos their model's name or photographer's album in bulk on immich-cull's **Name recent** tab (http://10.0.30.20:8102/name, LAN/WireGuard only; code in `homelab-config/immich-cull`).
+
+### Collecting a YouPic portfolio, or any page
+
+The toolbar button also collects:
+
+- **A YouPic profile** (`youpic.com/<name>`): **Collect this portfolio** scrolls through the whole portfolio and takes every photo at the largest size YouPic serves (1440 px; the grid shows 768). The album box is pre-filled with the photographer's name.
+- **Any other page**: **Collect the photos on this page** scrolls to the end (pages that load more as you scroll) and takes every photo at least 500 px, or the full-size image a thumbnail links to. **Use what's found** stops scrolling early.
+
+Keep the tab in front while it scrolls. Then it works like a tag run: preview, **Download** on the server, rerunning later only fetches what's new. Some sites only send images to a browser (Bellazon, behind Cloudflare); those fail on the server, and **From this tab** sends them from the open tab instead.
 
 Single right-click saves always save, even an image saved before; duplicates are deleted in Immich's duplicate review.
 

@@ -29,8 +29,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       // Elsewhere: Chrome already has the image, so it sends the bytes - some sites (e.g.
       // behind Cloudflare's bot check) won't let the server fetch it. If Chrome can't read it,
       // the server tries the address itself.
-      const bytes = await imageFromPage(tab.id, info.frameId, info.srcUrl);
-      downloadImage(info.srcUrl, tab.url, config.serverUrl, config.apiKey, undefined, bytes);
+      const src = largestVersion(info.srcUrl);
+      const bytes = await imageFromPage(tab.id, info.frameId, src);
+      downloadImage(src, tab.url, config.serverUrl, config.apiKey, undefined, bytes);
       return;
     }
     // Tumblr: the post links around the clicked image (plus the page itself on a post's own
@@ -51,6 +52,12 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     downloadImage(info.srcUrl, tab.url, config.serverUrl, config.apiKey, postUrls);
   });
 });
+
+// YouPic serves every size of a photo from one address ending in the size (8 hex digits, the
+// long side / 4); the grid shows 768 px, the largest it serves is 1440 px, so ask for more.
+function largestVersion(url) {
+  return String(url).replace(/^(https:\/\/(?:www\.)?youpic\.com\/i\/[0-9a-f]{40}[0-9a-f]*)[0-9a-f]{8}$/i, (_, stem) => `${stem}00000258`);
+}
 
 // Runs in the Tumblr page: the post links in the post that holds the right-clicked image.
 // tumblr-context.js recorded which element was right-clicked; failing that, the image is
@@ -172,13 +179,20 @@ async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey, postUrls, byt
 // Tag runs: the collector (collector.js, running in a Tumblr tab) hands its list to the
 // server through here, so the server URL and API key stay in the extension's storage.
 const BATCH_ROUTES = {
-  "inspo-batch-create": (msg) => ["POST", "/batch", { tag: msg.tag, items: msg.items }],
-  "inspo-batch-status": (msg) => ["GET", `/batch/${encodeURIComponent(msg.id)}`],
-  "inspo-batch-download": (msg) => ["POST", `/batch/${encodeURIComponent(msg.id)}/download`],
+  "inspo-batch-create": (msg) => ["POST", "/batch", { tag: msg.tag, source: msg.source, album: msg.album, items: msg.items }],
+  "inspo-batch-status": (msg) => ["GET", `/batch/${encodeURIComponent(msg.id)}${msg.items ? "?items=1" : ""}`],
+  "inspo-batch-download": (msg) => ["POST", `/batch/${encodeURIComponent(msg.id)}/download`, { album: msg.album || "" }],
   "inspo-batch-cancel": (msg) => ["POST", `/batch/${encodeURIComponent(msg.id)}/cancel`]
 };
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === "inspo-batch-item-bytes") {
+    sendItemBytes(msg).then(
+      (data) => sendResponse({ ok: true, data }),
+      (error) => sendResponse({ ok: false, error: error.message })
+    );
+    return true;
+  }
   const route = BATCH_ROUTES[msg?.type];
   if (!route) return false;
   batchRequest(...route(msg)).then(
@@ -195,6 +209,27 @@ async function batchRequest(method, path, body) {
     method,
     headers: { "X-API-Key": apiKey, ...(body ? { "Content-Type": "application/json" } : {}) },
     body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `The server answered HTTP ${response.status}.`);
+  return data;
+}
+
+// One image of a run that the server couldn't fetch, sent as bytes: what the page read
+// (dataUrl), else fetched here (the extension may read any site).
+async function sendItemBytes({ id, index, url, dataUrl }) {
+  let blob = dataUrl ? await (await fetch(dataUrl)).blob() : null;
+  if (!blob) {
+    const response = await fetch(url, { credentials: "include" });
+    if (!response.ok) throw new Error(`The site answered HTTP ${response.status}`);
+    blob = await response.blob();
+  }
+  const { serverUrl, apiKey } = await chrome.storage.local.get(["serverUrl", "apiKey"]);
+  if (!serverUrl || !apiKey) throw new Error("Set the server URL and API key in the extension's options first.");
+  const response = await fetch(`${serverUrl}/batch/${encodeURIComponent(id)}/items/${Number(index)}/bytes`, {
+    method: "POST",
+    headers: { "X-API-Key": apiKey, "Content-Type": blob.type || "application/octet-stream" },
+    body: blob
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || `The server answered HTTP ${response.status}.`);

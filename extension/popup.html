@@ -67,10 +67,22 @@
     [hidden] {
       display: none;
     }
+    h2.sub {
+      margin: 16px 0 8px;
+      font-size: 13px;
+      color: #666;
+    }
   </style>
 </head>
 <body>
-  <h2>Collect a Tumblr tag</h2>
+  <h2 id="title">Collect a Tumblr tag</h2>
+
+  <div id="onPage" hidden>
+    <div class="tag" id="pageName"></div>
+    <button id="collectPage"></button>
+    <p class="hint" id="pageHint"></p>
+    <h2 class="sub">Or open a Tumblr tag</h2>
+  </div>
 
   <div id="onTag" hidden>
     <div>Tag: <span class="tag" id="tagName"></span></div>

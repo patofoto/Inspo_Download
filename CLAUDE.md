@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Browser and phone tools for the Inspiration Board folder on the Mac mini (an Immich external library):
 
-1. **Chrome extension** (`extension/`) - right-click an image → POST its URL to the image-downloader server; toolbar popup → collect a whole Tumblr tag (`popup.js`, `collector.js`) and download it through the server's `/batch` endpoints
+1. **Chrome extension** (`extension/`) - right-click an image → POST its URL to the image-downloader server; toolbar popup → collect a whole Tumblr tag, YouPic portfolio or any page (`popup.js`, `collector.js`) and download it through the server's `/batch` endpoints
 2. **Scriptable** (`scriptable/InspoDownload.js`) - iOS share-sheet script that POSTs a shared link to the server
 3. **Webhook trigger** (`webhook-trigger/`) - toolbar button that GETs a configured webhook URL; the user points it at an n8n workflow that starts an Immich external library scan, so newly saved images show up. The URL lives only in the extension's options (chrome.storage), not in code
 
@@ -51,14 +51,16 @@ Toolbar popup on tumblr.com/tagged/<tag> → injects extension/collector.js into
 ```
 
 - Plan, findings and calibration: `docs/tumblr-tag-collector.md`
+- **Other sources (since 1.8)**, chosen by `collector.js` from the tab's address: a **YouPic profile** (scrolls the portfolio, an inner `DIV.scroll` that recycles its tiles, reading `a.media-image` tiles after every step; each photo's address is `youpic.com/i/<40-hex ID><…><8-hex size>`, size = long side / 4, so it asks for `00000258` and gets YouPic's maximum, 1440 px; `00000087` = 540 px for the re-upload check) and **any page** (scrolls to the end; photos ≥ 500 px, the largest `srcset` entry, or the image file a thumbnail links to). Batches carry `source` (`tumblr` / `youpic` / `page`); the server keys YouPic photos `youpic:<id>`, others `url:<sha1>`. Photos the server can't fetch get **From this tab**: the panel reads them in the page and the background worker posts them to `/batch/:id/items/:index/bytes`.
+- **Album:** the preview's album box (Tumblr: the tag; YouPic: the photographer; pages: empty) goes with the download; after the run the server adds the photos to that Immich album once the scan has picked them up, only if the album exists (never creates one).
 - Chrome pauses background tabs, so collecting needs the tab in front; pauses use `pause()`, which ends early when the tab becomes visible.
-- The server skips images downloaded before (ledger of media keys, existing file names) and re-uploads of the same photo (256-bit difference hash of the ~540 px thumbnail, ≤ 20 bits apart). It never talks to Immich.
+- The server skips images downloaded before (ledger of media keys, existing file names) and re-uploads of the same photo (256-bit difference hash of the ~540 px thumbnail, ≤ 20 bits apart). It talks to Immich only for the album step (`IMMICH_API_KEY`: album.read, albumAsset.create, asset.read).
 
 ## Development
 
 **Load an extension:** `chrome://extensions/` → Developer mode → Load unpacked → `extension/` or `webhook-trigger/`. After editing `background.js` or `options.js`, click the reload icon there.
 
-**Versioning:** bump `version` in `extension/manifest.json` with every change to the extension, so the number shown in `chrome://extensions` tells the user which build is loaded (1.2 = tag collector with download and an already-saved note; 1.3 = single saves always save again, the already-saved check and note removed; 1.4 = Download whole post; 1.5 = one right-click item, which saves the whole post on Tumblr; 1.6 = other sites send the image bytes from the browser; 1.7 = ⌥ Option + right-click on sites that block right-click, images labelled as plain data accepted).
+**Versioning:** bump `version` in `extension/manifest.json` with every change to the extension, so the number shown in `chrome://extensions` tells the user which build is loaded (1.2 = tag collector with download and an already-saved note; 1.3 = single saves always save again, the already-saved check and note removed; 1.4 = Download whole post; 1.5 = one right-click item, which saves the whole post on Tumblr; 1.6 = other sites send the image bytes from the browser; 1.7 = ⌥ Option + right-click on sites that block right-click, images labelled as plain data accepted; 1.8 = collect a YouPic portfolio or any page, album box, From this tab, YouPic right-click saves at 1440 px).
 
 **Test the server:**
 
