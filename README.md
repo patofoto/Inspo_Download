@@ -25,6 +25,8 @@ On the iPhone, the **Inspo Board** Shortcut in the share sheet does the same job
 
 On Tumblr, right-click → **Download to Network Drive** saves every photo in the post the image belongs to, like sharing the post from the phone; on any other site it saves just the image. It works on the dashboard, tag and search pages and on a post's own page. The badge shows `✓` for one image, the number saved for a post with several, in orange when the post couldn't be found, in which case only the clicked image was saved. (Tabs opened before the extension was loaded or reloaded may need a refresh first.) Right-clicking the enlarged preview saves just that image, a way to pick one image from a post.
 
+Sites that block right-clicking (YouPic, for one): hold **⌥ Option** while right-clicking and Chrome's menu, with **Download to Network Drive**, opens anyway.
+
 On other sites the extension sends the image as Chrome already has it, so sites that block downloads by anything but a browser (for example forums behind Cloudflare's bot check, like Bellazon) work too.
 
 ### Collecting a Tumblr tag

@@ -32,7 +32,9 @@ Right-click image → extension/background.js
 
 **On Tumblr pages the same menu item saves the whole post** (there is only one item since 1.5): `tumblr-context.js` (content script) records the right-clicked element; `findPostLinks` collects the post links in its `<article>` (or the nearest element with post links), plus the page itself if it's a permalink, and sends them as `postUrls` with the image. The server saves the photos of the first candidate post that really contains the image, else just the image; the reply's `post` is the matched link or `null`. Badge: `✓` for one image, else the count saved; orange if `post` is `null`. Right-clicking Tumblr's enlarged preview finds no post, so only that image is saved: the user relies on this to pick one image, keep it.
 
-**Other sites (since 1.6):** the extension reads the image bytes itself (`readImage` runs `fetch` in the page with its cookies; else the service worker fetches it) and POSTs them to `/upload-bytes` (headers `X-API-Key`, `X-Image-Url`, `X-Source-Url`, URI-encoded). Sites behind Cloudflare's bot check (e.g. Bellazon) answer the server with a challenge page, never the image. If Chrome can't read the image, or the server answers 404 (older server), it falls back to `/upload` with the address.
+**Other sites (since 1.6):** the extension reads the image bytes itself (`readImage` runs `fetch` in the page with its cookies; else the service worker fetches it) and POSTs them to `/upload-bytes` (headers `X-API-Key`, `X-Image-Url`, `X-Source-Url`, URI-encoded). Sites behind Cloudflare's bot check (e.g. Bellazon) answer the server with a challenge page, never the image. If Chrome can't read the image, or the server answers 404 (older server), it falls back to `/upload` with the address. Images labelled `application/octet-stream` (YouPic) are accepted too; the server sniffs the bytes.
+
+**Sites that block right-click (since 1.7):** `option-rightclick.js` (content script on all sites, `document_start`, all frames) stops a right-click made with ⌥ Option from reaching the page, so Chrome's menu opens (e.g. YouPic cancels every right-click). It also records the clicked element, since `tumblr-context.js` won't see that click. A plain right-click is untouched.
 
 Single saves always save, even an image saved before (the user deletes duplicates in Immich); the server still records each saved image's media key, so tag runs skip it.
 
@@ -56,7 +58,7 @@ Toolbar popup on tumblr.com/tagged/<tag> → injects extension/collector.js into
 
 **Load an extension:** `chrome://extensions/` → Developer mode → Load unpacked → `extension/` or `webhook-trigger/`. After editing `background.js` or `options.js`, click the reload icon there.
 
-**Versioning:** bump `version` in `extension/manifest.json` with every change to the extension, so the number shown in `chrome://extensions` tells the user which build is loaded (1.2 = tag collector with download and an already-saved note; 1.3 = single saves always save again, the already-saved check and note removed; 1.4 = Download whole post; 1.5 = one right-click item, which saves the whole post on Tumblr; 1.6 = other sites send the image bytes from the browser).
+**Versioning:** bump `version` in `extension/manifest.json` with every change to the extension, so the number shown in `chrome://extensions` tells the user which build is loaded (1.2 = tag collector with download and an already-saved note; 1.3 = single saves always save again, the already-saved check and note removed; 1.4 = Download whole post; 1.5 = one right-click item, which saves the whole post on Tumblr; 1.6 = other sites send the image bytes from the browser; 1.7 = ⌥ Option + right-click on sites that block right-click, images labelled as plain data accepted).
 
 **Test the server:**
 

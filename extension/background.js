@@ -92,19 +92,21 @@ async function imageFromPage(tabId, frameId, srcUrl) {
   try {
     const response = await fetch(srcUrl, { credentials: "include" });
     const blob = response.ok ? await response.blob() : null;
-    if (blob && blob.size && blob.type.startsWith("image/")) return blob;
+    if (blob && blob.size && /^(image\/|application\/octet-stream|binary\/octet-stream|$)/.test(blob.type)) return blob;
   } catch (err) {
     console.warn("Couldn't read the image:", err.message);
   }
   return null;
 }
 
-// Runs in the page: the image as a data: URL, or null (not an image, too big, or blocked).
+// Runs in the page: the image as a data: URL, or null (not an image, too big, or blocked). Some
+// sites (YouPic) label their images as plain data; the server checks the bytes themselves.
 async function readImage(srcUrl) {
   try {
     const response = await fetch(srcUrl, { credentials: "include" });
     const blob = response.ok ? await response.blob() : null;
-    if (!blob || !blob.size || blob.size > 50e6 || !blob.type.startsWith("image/")) return null;
+    if (!blob || !blob.size || blob.size > 50e6) return null;
+    if (!/^(image\/|application\/octet-stream|binary\/octet-stream|$)/.test(blob.type)) return null;
     return await new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
