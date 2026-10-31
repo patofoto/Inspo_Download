@@ -40,7 +40,7 @@ Single saves always save, even an image saved before (the user deletes duplicate
 
 The server fetches the image itself, which avoids CORS issues in the browser.
 
-**Saved files keep their metadata (since 2026-10-31):** the server converts every photo to JPEG keeping the photographer's EXIF/IPTC/XMP (camera, lens, date taken, credit, caption) minus the location, and writes `Saved from <page>` (plus `Collected from …` for runs) into the description Immich shows (`server/photo-metadata.js` in homelab-config). Tearsheet's Group by shoot uses the run line and the camera details.
+**Saved files keep their metadata (since 2026-10-31):** the server converts every photo to JPEG keeping the photographer's EXIF/IPTC/XMP (camera, lens, date taken, credit, caption) minus the location, and writes `Saved from <page>` (plus `Collected from …` for runs) into the description Immich shows (`server/photo-metadata.js` in homelab-config). Tearsheet's Group by shoot uses the camera details (never the download time).
 
 ## Flow (Tumblr tag collector)
 
