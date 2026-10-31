@@ -36,7 +36,7 @@ On other sites the extension sends the image as Chrome already has it, so sites 
 3. The server checks the list and the panel shows a preview: photos found, downloaded before, re-uploads (the same photo posted by several blogs; the biggest copy is kept), new to download. Nothing has been downloaded yet.
 4. **Download** saves the new ones on the server, one at a time. The panel shows progress; **Stop** pauses (continue later), **Hide** closes the panel while the server carries on. The album box (pre-filled with the tag) puts the photos into that Immich album once Immich has scanned them, only if an album by that name exists already.
 5. Press the webhook-trigger button so Immich picks up the new photos, then cull in Immich's duplicate review.
-6. Give the new photos their model's name or photographer's album in bulk on **Tearsheet**'s Photos tab (http://10.0.30.20:8102, LAN/WireGuard only; code in `homelab-config/immich-cull`). Its **Explore** tab (`/explore`) finds a model's photos by a photographer, smart-searches inside them, and shows the photos that look like one (the rest of a shoot).
+6. Give the new photos their model's name or photographer's album in bulk on **Tearsheet**'s Photos tab (http://10.0.30.20:8102, LAN/WireGuard only; code in `homelab-config/immich-cull`). Its **Explore** tab (`/explore`) finds a model's photos by a photographer, smart-searches inside them, and shows the photos that look like one (the rest of a shoot); **Group by shoot** sorts a model's or photographer's photos into shoots.
 
 ### Collecting a YouPic portfolio, or any page
 
