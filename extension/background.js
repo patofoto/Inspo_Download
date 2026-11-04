@@ -160,19 +160,17 @@ async function downloadImage(imageUrl, pageUrl, serverUrl, apiKey, postUrls, byt
     // For 3 seconds: a green checkmark for one image, the number saved for a post with several,
     // in orange when the Tumblr post couldn't be found and only the clicked image was saved
     if (postUrls && data.post === null) {
-      showBadge(String(data.count || 1), "#fb8c00");
+      showBadge(String(data.count || 1), "#fb8c00", 3000);
     } else if (data.count > 1) {
-      showBadge(String(data.count), "#4caf50");
+      showBadge(String(data.count), "#4caf50", 3000);
     } else {
-      showBadge("✓", "#4caf50");
+      showBadge("✓", "#4caf50", 3000);
     }
-    setTimeout(() => showBadge("", "#4caf50"), 3000);
 
   } catch (error) {
     console.error("Error downloading image:", error);
     // Show red X for 3 seconds
-    showBadge("✗", "#f44336");
-    setTimeout(() => showBadge("", "#f44336"), 3000);
+    showBadge("✗", "#f44336", 3000);
   }
 }
 
@@ -236,7 +234,12 @@ async function sendItemBytes({ id, index, url, dataUrl }) {
   return data;
 }
 
-function showBadge(text, color) {
+// The toolbar badge; with ms it clears itself after that long. A newer badge cancels the older one's
+// clearing, so two saves close together don't blank each other's "..." or ✓.
+let badgeTimer = null;
+function showBadge(text, color, ms = 0) {
+  clearTimeout(badgeTimer);
   chrome.action.setBadgeText({ text });
   chrome.action.setBadgeBackgroundColor({ color });
+  if (ms) badgeTimer = setTimeout(() => chrome.action.setBadgeText({ text: "" }), ms);
 }

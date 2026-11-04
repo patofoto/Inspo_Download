@@ -13,8 +13,12 @@
 // serve browsers) can then be sent from this tab. Afterwards the server adds the run's photos to
 // the Immich album named in the panel, if Immich already has an album by that name.
 (() => {
-  if (window.__inspoCollector) {
-    window.__inspoCollector.show();
+  // The popup again while a panel is open: the same page, or a run still collecting, keeps that panel; on
+  // another page (Tumblr and YouPic change pages without loading one) a run that's done collecting gives way
+  // to a new one (its download, if started, carries on on the server)
+  const open = window.__inspoCollector;
+  if (open && (!open.reopen || open.reopen())) {
+    if (!open.reopen) open.show();
     return;
   }
 
@@ -86,6 +90,8 @@
   }
 
   let downloadStarted = false;
+  let collecting = true;     // collecting, sending or checking: until the preview (or an error)
+  const startedOn = location.href;
 
   // Closing before the download drops the run on the server; once downloading, the server
   // carries on without the panel.
@@ -97,7 +103,14 @@
   }
   $(".x").addEventListener("click", close);
 
-  window.__inspoCollector = { show: () => host.isConnected || document.documentElement.appendChild(host) };
+  window.__inspoCollector = {
+    show: () => host.isConnected || document.documentElement.appendChild(host),
+    reopen() {        // true: this panel stays (shown again); false: it closed, for a new run
+      if (location.href === startedOn || collecting) { this.show(); return true; }
+      close();
+      return false;
+    }
+  };
 
   // Server calls go through the background worker, which holds the URL and API key
   function server(message) {
@@ -316,10 +329,11 @@
         const largest = (img) => {
           let best = img.currentSrc || img.src;
           let bestW = img.naturalWidth || 0;
-          for (const part of (img.getAttribute("srcset") || "").split(",")) {
-            const [u, d] = part.trim().split(/\s+/);
-            const w = /^\d+w$/.test(d || "") ? parseInt(d, 10) : 0;
-            if (u && w > bestW) {
+          // an entry is an address and its width ("1000w"); addresses can hold commas themselves
+          // (Cloudinary's and Substack's w_1000,c_fill), so entries are read whole, not split at commas
+          for (const [, u, d] of (img.getAttribute("srcset") || "").matchAll(/(?:^|,)\s*(\S+)\s+(\d+)w\b/g)) {
+            const w = parseInt(d, 10);
+            if (w > bestW) {
               best = new URL(u, location.href).href;
               bestW = w;
             }
@@ -375,6 +389,7 @@
     $(".result").replaceChildren();
     if (stopped) return;
     if (!items.length) {
+      collecting = false;
       setStatus(none);
       setActions([{ label: "Close", onClick: close }]);
       return;
@@ -395,6 +410,7 @@
     }
     if (stopped) return;
     if (batch.phase !== "ready") throw new Error(`The server's check ended as "${batch.phase}". ${(batch.warnings || []).join(" ")}`);
+    collecting = false;
 
     const c = batch.counts;
     setStatus(`Ready. Nothing has been downloaded yet.`);
@@ -519,6 +535,7 @@
   }
 
   function showError(err) {
+    collecting = false;
     if (stopped) return;
     setStatus(err.message, true);
     setActions([{ label: "Close", onClick: close }]);
