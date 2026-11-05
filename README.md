@@ -11,6 +11,7 @@ The server is not in this repo. It lives in [`homelab-config/image-downloader-m1
 | `extension/` | Chrome extension: right-click an image → **Download to Network Drive** (on Tumblr: the whole post); and from the toolbar button, collect a whole Tumblr tag, YouPic portfolio or page |
 | `scriptable/` | iOS Scriptable script: share a link → send it to the server |
 | `webhook-trigger/` | Chrome extension: a toolbar button that calls an n8n webhook, which starts an Immich external library scan so newly saved images show up |
+| `finder/` | Mac Finder Quick Action: right-click photos or folders on your computer → send them to the server |
 
 On the iPhone, the **Inspo Board** Shortcut in the share sheet does the same job as the Scriptable script: it POSTs the shared link to `/upload` and shows the server's reply as a notification.
 
@@ -50,6 +51,10 @@ Keep the tab in front while it scrolls. Then it works like a tag run: preview, *
 Single right-click saves always save, even an image saved before; duplicates are deleted in Immich's duplicate review.
 
 Plan and findings: [`docs/tumblr-tag-collector.md`](docs/tumblr-tag-collector.md).
+
+### Photos on your computer (Finder)
+
+Run `zsh finder/install.sh` once. Then select photos, or folders of photos, in Finder → right-click → **Quick Actions** → **Save Image to Inspiration Board**. They go through the server like a web save: converted to JPEG (HEIC and camera raw files are converted on the Mac first), camera details kept, location removed, file name kept. The first time it asks for the API key and, optionally, the Immich scan webhook (the webhook-trigger button's address); with the webhook set, Immich scans as soon as the photos are sent. Settings live in `~/.config/inspo-board/config`. A notification says how many were saved; anything not saved is listed in a message. Up to 50 MB per photo (larger ones are made smaller as JPEG first). Rerun `install.sh` after editing `finder/save-to-inspiration-board.sh`.
 
 ### Webhook trigger
 

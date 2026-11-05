@@ -9,6 +9,7 @@ Browser and phone tools for the Inspiration Board folder on the Mac mini (an Imm
 1. **Chrome extension** (`extension/`) - right-click an image → POST its URL to the image-downloader server; toolbar popup → collect a whole Tumblr tag, YouPic portfolio or any page (`popup.js`, `collector.js`) and download it through the server's `/batch` endpoints
 2. **Scriptable** (`scriptable/InspoDownload.js`) - iOS share-sheet script that POSTs a shared link to the server
 3. **Webhook trigger** (`webhook-trigger/`) - toolbar button that GETs a configured webhook URL; the user points it at an n8n workflow that starts an Immich external library scan, so newly saved images show up. The URL lives only in the extension's options (chrome.storage), not in code
+4. **Finder Quick Action** (`finder/`) - "Save Image to Inspiration Board": right-click photos or folders in Finder → `save-to-inspiration-board.sh` POSTs each file to `/upload-bytes` with `X-File-Name` (the saved file keeps its name, no "Saved from" line). HEIC, camera raw and files over 50 MB are made JPEG with `sips` first. Settings (API key, optional scan webhook) in `~/.config/inspo-board/config`, asked for on first use. `install.sh` copies the workflow bundle to `~/Library/Services` and puts the script inside it; rerun it after editing the script
 
 The user's iPhone mainly uses an iOS Shortcut ("Inspo Board", not in this repo) that does the same as the Scriptable script.
 
