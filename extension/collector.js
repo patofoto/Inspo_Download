@@ -177,6 +177,12 @@
     let box = scroller();
     let idle = 0;
     grab();
+    if (box.scrollTop > 0) {
+      box.scrollTo({ top: 0, behavior: "instant" });   // start from the top, so recycled tiles above aren't missed
+      await pause(SCROLL_PAUSE_MS);
+      if (stopped || enough) return;
+      grab();
+    }
     for (let steps = 1; !stopped && !enough && steps <= MAX_SCROLLS && idle < 6; steps++) {
       const height = box.scrollHeight;
       const before = count();
@@ -334,8 +340,10 @@
           for (const [, u, d] of (img.getAttribute("srcset") || "").matchAll(/(?:^|,)\s*(\S+)\s+(\d+)w\b/g)) {
             const w = parseInt(d, 10);
             if (w > bestW) {
-              best = new URL(u, location.href).href;
-              bestW = w;
+              try {
+                best = new URL(u, location.href).href;
+                bestW = w;
+              } catch {}
             }
           }
           return best;

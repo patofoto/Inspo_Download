@@ -20,8 +20,7 @@ if (!sharedUrl) {
   return
 }
 
-// Send Tumblr post URLs as-is - the server extracts the image
-// (with the logged-in cookie, skipping avatars)
+// Send Tumblr post URLs as-is - the server resolves every photo in the post
 let imageUrl = sharedUrl
 let sourceUrl = sharedUrl
 
@@ -48,10 +47,10 @@ try {
   let res = await request.loadJSON()
   if (res.success) {
     resultAlert.title = "Saved!"
-    resultAlert.message = res.filename || "Image downloaded."
+    resultAlert.message = res.count > 1 ? `${res.count} photos saved.` : (res.filename || "Image downloaded.")
   } else {
     resultAlert.title = "Server Error"
-    resultAlert.message = res.error || "Unknown error"
+    resultAlert.message = res.message || res.error || "Unknown error"
   }
 } catch(e) {
   resultAlert.title = "Request Failed"

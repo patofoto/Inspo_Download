@@ -13,17 +13,18 @@ chrome.action.onClicked.addListener(() => {
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      showBadge("✓", "#4caf50");
-      setTimeout(() => showBadge("", "#4caf50"), 3000);
+      showBadge("✓", "#4caf50", 3000);
     } catch (error) {
       console.error("Webhook error:", error);
-      showBadge("✗", "#f44336");
-      setTimeout(() => showBadge("", "#f44336"), 3000);
+      showBadge("✗", "#f44336", 3000);
     }
   });
 });
 
-function showBadge(text, color) {
+let badgeTimer = null;
+function showBadge(text, color, ms = 0) {
+  clearTimeout(badgeTimer);
   chrome.action.setBadgeText({ text });
   chrome.action.setBadgeBackgroundColor({ color });
+  if (ms) badgeTimer = setTimeout(() => chrome.action.setBadgeText({ text: "" }), ms);
 }
