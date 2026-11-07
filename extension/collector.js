@@ -198,11 +198,15 @@
   }
 
   // ---- Sources ----
+  // A tag page, or a search page: Tumblr forwards some tags (those without a tag feed of their own)
+  // to a search for the same words, whose Latest view goes back years too.
   function tumblrSource() {
-    const tag = decodeURIComponent((location.pathname.match(/^\/tagged\/([^/]+)/) || [])[1] || "");
+    const [, where, word] = location.pathname.match(/^\/(tagged|search)\/([^/]+)/) || [];
+    const tag = decodeURIComponent(word || "");
+    const isSearch = where === "search";
     return {
       kind: "tumblr",
-      label: `#${tag}`,
+      label: isSearch ? `search “${tag}”` : `#${tag}`,
       title: tag,
       album: tag,
       canStopEarly: false,
@@ -211,7 +215,8 @@
         const state = JSON.parse(document.getElementById("___INITIAL_STATE___")?.textContent || "null");
         const token = state?.apiFetchStore?.API_TOKEN;
         if (!tag || !token) throw new Error("This doesn't look like a Tumblr tag page. Reload the page and try again.");
-        const headers = { Authorization: `Bearer ${token}`, ...(state.apiFetchStore.extraHeaders || {}) };
+        const extra = state.apiFetchStore.extraHeaders;   // an object of headers; Tumblr has also sent a string here
+        const headers = { Authorization: `Bearer ${token}`, ...(extra && typeof extra === "object" && !Array.isArray(extra) ? extra : {}) };
 
         const stats = { pages: 0, posts: 0, ads: 0, gifs: 0, textOnly: 0, sameUpload: 0, mature: 0 };
         const byKey = new Map();
@@ -255,7 +260,9 @@
           }
         };
 
-        let next = `/v2/hubs/${encodeURIComponent(tag)}/timeline?sort=recent&limit=14`;
+        let next = isSearch
+          ? `/v2/timeline/search?limit=20&days=0&query=${encodeURIComponent(tag)}&mode=recent&timeline_type=post&reblog_info=true`
+          : `/v2/hubs/${encodeURIComponent(tag)}/timeline?sort=recent&limit=14`;
         while (next && !stopped && stats.pages < MAX_PAGES) {
           const response = await fetchPage(`https://www.tumblr.com/api${next}`, headers);
           if (!response.ok) throw new Error(`Tumblr answered HTTP ${response.status} on page ${stats.pages + 1}.`);
@@ -271,7 +278,7 @@
         }
         return {
           items: [...byKey.values()],
-          none: `No photos found under #${tag} (${fmt(stats.posts)} posts).`,
+          none: `No photos found ${isSearch ? `searching “${tag}”` : `under #${tag}`} (${fmt(stats.posts)} posts).`,
           note: `From ${fmt(stats.posts)} posts (${fmt(stats.mature)} photos from mature posts). Left out: ${fmt(stats.ads)} ads, ${fmt(stats.gifs)} GIFs, ${fmt(stats.textOnly)} text posts, ${fmt(stats.sameUpload)} reblogs of the same upload.`
         };
       }
@@ -379,7 +386,7 @@
     };
   }
 
-  const SOURCE = location.hostname === "www.tumblr.com" && location.pathname.startsWith("/tagged/") ? tumblrSource()
+  const SOURCE = location.hostname === "www.tumblr.com" && /^\/(tagged|search)\//.test(location.pathname) ? tumblrSource()
     : /(^|\.)youpic\.com$/.test(location.hostname) ? youpicSource()
     : pageSource();
   $(".tag").textContent = SOURCE.label;

@@ -1,7 +1,8 @@
 // Toolbar popup. Starts the collector (collector.js, injected into the tab, where it keeps
 // running after this popup closes) on a Tumblr tag page, a YouPic profile (its portfolio) or
 // any other page (the photos on it). Also opens a Tumblr tag page for a typed name.
-const TAG_PAGE = /^https:\/\/www\.tumblr\.com\/tagged\/([^/?#]+)/;
+// Tumblr forwards some tags (no tag feed of their own) to a search page, so that's collected too.
+const TAG_PAGE = /^https:\/\/www\.tumblr\.com\/(?:tagged|search)\/([^/?#]+)/;
 const YOUPIC_PAGE = /^https:\/\/(?:www\.)?youpic\.com\/([A-Za-z0-9_.-]+)\/?(?:[?#]|$)/;
 const YOUPIC_NOT_PROFILES = new Set(["discover", "explore", "search", "login", "join", "signup", "settings", "messages",
   "notifications", "feed", "web", "about", "help", "privacy", "terms", "blog", "contests", "pricing"]);
@@ -31,6 +32,11 @@ chrome.tabs.query({ active: true, currentWindow: true }, async ([tab]) => {
   const match = tab?.url?.match(TAG_PAGE);
   if (match) {
     $("tagName").textContent = decodeURIComponent(match[1]);
+    if (/\/search\//.test(tab.url)) {
+      $("tagLabel").textContent = "Search: ";
+      $("collect").textContent = "Collect this search";
+      $("tagHint").textContent = "Tumblr has no tag page for this name, so this takes every photo post the search finds (Latest), then shows what's new before anything is downloaded.";
+    }
     $("onTag").hidden = false;
     $("collect").addEventListener("click", startCollector);
     return;

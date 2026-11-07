@@ -19,6 +19,8 @@ Built on a `feature/tumblr-tag-collector` branch in both repos, merged into `mai
 
 The tag page's **Latest** view in the logged-in browser is the only source that is both deep and includes mature posts. Its **Top** view is shallow (16 posts).
 
+**Update, Nov 6, 2026:** the search page's own API with `mode=recent&days=0` (`/api/v2/timeline/search?query=…&timeline_type=post`) is as deep as the tag page: 1,097 posts for `marta bevacqua` (1,050 on the tag page, 1,047 in both, back to 2009, mature posts included). The shallow numbers above were the search page as shown, not this API. Tumblr forwards some tags without a tag feed (`viktor korneev`: `/hubs/` answers 404) to the search page, so extension 1.11 collects there with this API.
+
 How the tag page loads (Tumblr's internal API, as used by the website itself):
 
 - First page: `GET https://www.tumblr.com/api/v2/hubs/{tag}/timeline?sort=recent&limit=14`

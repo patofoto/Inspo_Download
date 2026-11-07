@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Image Downloader to Network Drive",
-  "version": "1.10",
+  "version": "1.11",
   "description": "Right-click on images to download them to your network drive, or collect a whole Tumblr tag, YouPic portfolio or page",
   "permissions": [
     "contextMenus",
